@@ -1,2 +1,5 @@
 agentdemoenv/
 .DS_Store
+.continue/
+*.png
+
