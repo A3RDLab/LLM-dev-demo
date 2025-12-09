@@ -82,15 +82,6 @@ class AgentState(TypedDict):
 model = ChatOpenAI(model="Qwen/Qwen3-235B-A22B", openai_api_base="https://api.siliconflow.cn/v1/", temperature=0).bind_tools(TOOLS)
 
 def call_model(state: AgentState):
-    """
-    Agent node: Call LLM for reasoning.
-
-    Args:
-        state: Current graph state.
-
-    Returns:
-        A dictionary containing the LLM response to update the state.
-    """
     messages = state['messages']
     response = model.invoke(messages)
     return {"messages": [response]}
@@ -99,17 +90,6 @@ def call_model(state: AgentState):
 tool_node = ToolNode(TOOLS)
 
 def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
-    """
-    Conditional edge routing function: Decide the next node.
-
-    Args:
-        state: Current graph state.
-
-    Returns:
-        A string indicating the next node name.
-        "tools" means a tool should be called.
-        "__end__" is a special constant indicating the end of the flow.
-    """
     last_message = state['messages'][-1]
     if last_message.tool_calls:
         return "tools"
