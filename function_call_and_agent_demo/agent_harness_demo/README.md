@@ -87,6 +87,7 @@ pip install -r requirements.txt
 
 # 配置 Key（复用仓库根目录 .env 的 API_KEY，或 export）
 export API_KEY=<硅基流动等 OpenAI 兼容平台的 Key>
+# Windows PowerShell：$env:API_KEY="<Key>"
 
 # 默认任务：按 xlsx skill 规范分析销售数据，产出 report.md + output/report.xlsx
 python agent_harness_demo.py
@@ -110,6 +111,7 @@ python agent_harness_demo.py --task "分析各地区的销售分布" \
 
 ## 注意事项
 
+- 本 demo 在 macOS 实测通过；Windows 用户请先阅读 [实验指南.md](实验指南.md) 的"Windows 用户注意"小节（主要是 LibreOffice 重算链的 PATH 适配，其余为跨平台纯 Python）
 - 切勿在代码中硬编码 API Key
 - `execute_python` 工具会真实执行模型生成的代码且无隔离，仅用于本地学习演示，勿在生产环境照搬；生产沙箱可参考 `excel-process/` 的做法
 - 人工智能生成内容仅供参考
