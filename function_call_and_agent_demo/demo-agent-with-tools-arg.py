@@ -17,13 +17,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Function definitions remain the same
-def get_repo_tree(repo_full_name: str, branch: str | None = None) -> str:
+def _github_client() -> Github:
+    """有 GITHUB_TOKEN 则鉴权（限额高），没有则匿名访问（仅公开仓库，60次/小时）"""
     token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        raise ValueError("GITHUB_TOKEN environment variable is required")
-    
+    return Github(token) if token else Github()
+
+def get_repo_tree(repo_full_name: str, branch: str | None = None) -> str:
     try:
-        g = Github(token)
+        g = _github_client()
         repo = g.get_repo(repo_full_name)
     except Exception as e:
         raise RuntimeError(f"Failed to access repository {repo_full_name}: {str(e)}")
@@ -36,12 +37,8 @@ def get_repo_tree(repo_full_name: str, branch: str | None = None) -> str:
     return tree_str
 
 def get_repo_file_content(repo_full_name: str, file_path: str, branch: str | None = None) -> str:
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        raise ValueError("GITHUB_TOKEN environment variable is required")
-    
     try:
-        g = Github(token)
+        g = _github_client()
         repo = g.get_repo(repo_full_name)
     except Exception as e:
         raise RuntimeError(f"Failed to access repository {repo_full_name}: {str(e)}")
@@ -116,14 +113,12 @@ def call_with_messages(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     
     client = OpenAI(
         api_key=api_key,
-        base_url="https://api.siliconflow.cn/v1/"
-        # base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+        base_url=os.getenv("API_BASE", "https://api.siliconflow.cn/v1/")
     )
 
     try:
         response = client.chat.completions.create(
-            model="Pro/deepseek-ai/DeepSeek-V3",
-            # model="qwen-max",
+            model=os.getenv("MODEL", "Pro/deepseek-ai/DeepSeek-V3"),
             messages=messages,
             tools=TOOLS,
             temperature=0.5
@@ -146,6 +141,12 @@ def execute_function(tool_call: Dict[str, Any]) -> str:
 def run_agent(query: str, max_iterations: int = 10) -> str:
     """Run the agent with the given query."""
     logger.info(f"Starting agent with query: {query}")
+
+    def _preview(text: Any, limit: int = 300) -> str:
+        """日志截断：工具结果可能有几千行（如仓库目录树），全量打印会刷屏"""
+        s = str(text)
+        return s if len(s) <= limit else s[:limit] + f"... [共{len(s)}字符，已截断]"
+
     messages = [
         {"role": "system", "content": "You are a helpful assistant for software development tasks."},
         {"role": "user", "content": query}
@@ -156,10 +157,10 @@ def run_agent(query: str, max_iterations: int = 10) -> str:
         try:
             logger.info("Calling LLM with messages:")
             for msg in messages:
-                logger.info(f"{msg['role'].capitalize()}: {msg['content']}")
+                logger.info(f"{msg['role'].capitalize()}: {_preview(msg['content'])}")
             
             response = call_with_messages(messages)
-            logger.info(f"Received LLM response: {response}")
+            logger.info(f"Received LLM response: {_preview(response.content)} | tool_calls: {len(response.tool_calls or [])} 个")
             
             if not response.tool_calls:
                 # No tool calls, return the final answer
@@ -182,7 +183,7 @@ def run_agent(query: str, max_iterations: int = 10) -> str:
                 # Then add tool responses
                 for tool_call in response.tool_calls:
                     function_response = execute_function(tool_call)
-                    logger.info(f"Tool execution result for {tool_call.function.name}: {function_response[:200]}...")  # Truncate long responses
+                    logger.info(f"Tool execution result for {tool_call.function.name}: {_preview(function_response, 200)}")
                     messages.append({
                         "role": "tool",
                         "content": function_response,
@@ -193,8 +194,9 @@ def run_agent(query: str, max_iterations: int = 10) -> str:
             iteration += 1
             
         except Exception as e:
+            # 不要把错误当正常结果 return，否则调用方会把错误误认为最终答案
             logger.error(f"Error in iteration {iteration}: {str(e)}")
-            return f"Error: {str(e)}"
+            raise RuntimeError(f"Agent failed in iteration {iteration}: {str(e)}") from e
     
     error_msg = "Agent exceeded maximum iterations without reaching a final answer"
     logger.error(error_msg)

@@ -23,3 +23,4 @@ vanna
 
 # 其他
 python-dotenv>=1.0
+PyGithub>=2.1  # demo-agent-with-tools-arg.py 的 GitHub 工具
