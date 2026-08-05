@@ -59,31 +59,66 @@ TEXT = """
 会议主要讨论了大模型在企业知识管理场景的落地方案。
 """
 
-# ===== 4. 发起带 json_schema 约束的请求 =====
-completion = client.chat.completions.create(
-    model=args.model,
-    messages=[
-        {"role": "system", "content": "你是一个信息抽取助手，请严格按给定 Schema 输出结果。"},
-        {"role": "user", "content": f"请从下面的文本中抽取联系人信息：\n\n{TEXT}"},
-    ],
-    response_format={
-        "type": "json_schema",
-        "json_schema": {
-            "name": "extraction_result",
-            "strict": True,
-            # 直接从 Pydantic 模型生成 Schema，模型定义即契约
-            "schema": ExtractionResult.model_json_schema(),
-        },
+MESSAGES = [
+    # 注意：提示词里明确提到 JSON——json_object 宽松模式要求 messages 中必须出现 "json" 字样
+    {"role": "system", "content": "你是一个信息抽取助手，请严格按给定 Schema 输出 JSON 结果。"},
+    {
+        "role": "user",
+        # 关键：宽松模式下服务端不会把 Schema 传给模型，必须把 Schema 写进提示词，
+        # 否则模型不知道需要哪些字段（实战中常见的丢字段问题）
+        "content": (
+            f"请从下面的文本中抽取联系人信息，输出符合以下 JSON Schema 的 JSON：\n"
+            f"{json.dumps(ExtractionResult.model_json_schema(), ensure_ascii=False, indent=2)}\n\n"
+            f"文本：\n{TEXT}"
+        ),
     },
-    temperature=0.2,
-)
+]
+
+# ===== 4. 发起请求：优先 json_schema 严格模式，不支持时自动降级为 json_object =====
+from openai import BadRequestError
+
+# 关键经验：思考模型开思考模式做结构化输出容易失控（思考流与 JSON 约束打架，
+# 产出超长垃圾文本），生产上对思考模型做 JSON 抽取时应关闭思考
+EXTRA_BODY = {"enable_thinking": False}
+
+try:
+    completion = client.chat.completions.create(
+        model=args.model,
+        messages=MESSAGES,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "extraction_result",
+                "strict": True,
+                # 直接从 Pydantic 模型生成 Schema，模型定义即契约
+                "schema": ExtractionResult.model_json_schema(),
+            },
+        },
+        extra_body=EXTRA_BODY,
+        max_tokens=2000,
+        temperature=0.2,
+    )
+    mode = "json_schema 严格模式（服务端保证符合 Schema）"
+except BadRequestError as e:
+    # 部分部署只支持 json_object：只保证输出是合法 JSON，不保证符合 Schema，
+    # 结构正确性完全依赖后面的 Pydantic 校验兑底
+    print(f"[服务端不支持 json_schema，降级为 json_object 宽松模式]\n{str(e)[:120]}...\n")
+    completion = client.chat.completions.create(
+        model=args.model,
+        messages=MESSAGES,
+        response_format={"type": "json_object"},
+        extra_body=EXTRA_BODY,
+        max_tokens=2000,
+        temperature=0.2,
+    )
+    mode = "json_object 宽松模式（仅保证合法 JSON）"
 
 raw = completion.choices[0].message.content
 
-# ===== 5. 服务端已保证格式合法，可放心直接解析并用 Pydantic 校验 =====
+# ===== 5. 解析并用 Pydantic 校验（宽松模式下这一步是结构正确性的唯一防线） =====
 result = ExtractionResult.model_validate_json(raw)
 
-print("=== 原始 JSON ===")
+print(f"=== 原始 JSON（{mode}） ===")
 print(json.dumps(json.loads(raw), ensure_ascii=False, indent=2))
 
 print("\n=== Pydantic 对象（可直接用于后续业务逻辑） ===")
