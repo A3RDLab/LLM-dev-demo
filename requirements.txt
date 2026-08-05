@@ -1,0 +1,24 @@
+# 根目录脚本与各 demo 的公共依赖
+# 子项目有独立依赖的见各自的 requirements.txt / pyproject.toml：
+#   function_call_and_agent_demo/excel-process/requirements.txt
+#   finance_doc_review/pyproject.toml
+
+openai>=1.60
+pydantic>=2.7
+langchain-openai>=0.3
+langgraph>=1.0
+langchain-mcp-adapters>=0.1
+mcp[cli]>=1.9
+
+# RAG 相关（AliyunQA_RAG_demo）
+streamlit>=1.35
+redis>=5.0
+numpy>=1.26
+tiktoken
+dashscope>=1.20
+
+# Text2SQL（vanna_demo）
+vanna
+
+# 其他
+python-dotenv>=1.0
