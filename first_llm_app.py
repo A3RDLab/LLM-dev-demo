@@ -13,6 +13,11 @@ parser.add_argument('--base_url', type=str, default="https://api.siliconflow.cn/
 
 args = parser.parse_args()
 
+# 终端颜色（ANSI 转义码）：思考过程灰色，正式回复青色，便于区分
+GRAY = "\033[90m"
+CYAN = "\033[36m"
+RESET = "\033[0m"
+
 # 优先使用命令行提供的API_KEY，若没有则使用环境变量
 api_key = args.api_key if args.api_key else os.getenv("API_KEY")
 
@@ -59,35 +64,42 @@ while True:
             delta = chunk.choices[0].delta
             
             # 处理思考过程
-            if hasattr(delta, 'reasoning_content') and delta.reasoning_content is not None:
+            # 注意：用真值判断而非 is not None，且与 content 分支相互独立——
+            # 过渡 chunk 可能同时携带 reasoning_content="" 和 content，
+            # 若用 elif 互斥会把正文 token 丢掉
+            reasoning_piece = getattr(delta, 'reasoning_content', None)
+            if reasoning_piece:
                 # 第一次发现有思考能力时，显示思考提示
                 if not has_reasoning:
                     has_reasoning = True
-                    print(f"\n{args.model} 正在思考...")
+                    print(f"\n{GRAY}── {args.model} 正在思考... ──{RESET}")
                 
-                print(f"\033[37m{delta.reasoning_content}\033[0m", end='', flush=True)
-                reasoning_content += delta.reasoning_content
+                print(f"{GRAY}{reasoning_piece}{RESET}", end='', flush=True)
+                reasoning_content += reasoning_piece
             
             # 处理回复内容
-            elif hasattr(delta, 'content') and delta.content is not None:
+            if delta.content:
                 # 首次开始回复时显示分隔
-                if not is_answering and delta.content != "":
+                if not is_answering:
                     # 如果有思考过程，添加额外换行
                     if has_reasoning:
-                        print(f"\n\n{args.model} 回复:")
+                        print(f"\n\n{CYAN}── {args.model} 回复: ──{RESET}")
                     else:
                         # 如果没有思考过程，直接显示回复提示
-                        print(f"\n{args.model} 回复:")
+                        print(f"\n{CYAN}── {args.model} 回复: ──{RESET}")
                     
                     is_answering = True
                 
                 # 输出回复内容
-                print(delta.content, end='', flush=True)
+                print(f"{CYAN}{delta.content}{RESET}", end='', flush=True)
                 answer_content += delta.content
     
     # 将完整回复添加到对话历史
     if answer_content:
         messages.append({'role': 'assistant', 'content': answer_content})
         print()  # 在回复结束后添加换行
+    elif has_reasoning:
+        # 兑底提示：模型只输出了思考过程，未返回正文（通常是部署配置或模型异常）
+        print(f"\n{GRAY}[模型只输出了思考过程，未返回正文内容]{RESET}")
 
 print("对话已结束")
