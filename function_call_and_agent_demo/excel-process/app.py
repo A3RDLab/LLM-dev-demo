@@ -25,6 +25,15 @@ def get_client() -> OpenAI:
         base_url=os.getenv("API_BASE", "https://api.siliconflow.cn/v1/")
     )
 
+def _update_status(status, **kwargs) -> None:
+    """更新进度状态；非 Streamlit 运行时（如无头测试）自动降级为无操作"""
+    if status is None:
+        return
+    try:
+        status.update(**kwargs)
+    except Exception:
+        pass
+
 # 设置页面配置
 st.set_page_config(
     page_title="Excel数据分析助手",
@@ -40,8 +49,13 @@ st.markdown("上传Excel文件并使用自然语言描述您的分析需求，AI
 def run_code(lang: str, code: str, libraries: Optional[List] = None) -> str:
     """
     在沙盒环境中运行代码
+
+    commit_container=True：代码执行产生的文件（如生成的图片）需要被后续
+    会话（copy_file_from_sandbox）看到，必须把容器状态提交进模板镜像
     """
-    with SandboxSession(lang=lang, verbose=False, keep_template=True) as session:
+    # 防御：模型偶尔会漏传 lang（即使在 schema 中标为必填），默认按 python 处理
+    lang = lang or "python"
+    with SandboxSession(lang=lang, verbose=False, keep_template=True, commit_container=True) as session:
         # 新版 llm-sandbox 的 .text 已废弃，改用 .stdout
         result = session.run(code, libraries).stdout
         if not result or result.strip() == '':
@@ -70,9 +84,15 @@ def copy_file_to_sandbox(local_path: str, sandbox_path: str) -> str:
 def copy_file_from_sandbox(sandbox_path: str, local_path: str) -> str:
     """
     从沙盒环境复制文件到本地
+
+    同样需要 keep_template + commit_container：本会话取完文件后提交容器状态，
+    保证后续会话（如下次 run_code）看到一致的沙盒文件系统。
+    相对路径基于应用目录解析：LLM 容易拼错长绝对路径，短文件名更可靠
     """
     try:
-        with SandboxSession(lang="python", keep_template=True) as session:
+        if not os.path.isabs(local_path):
+            local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), local_path)
+        with SandboxSession(lang="python", keep_template=True, commit_container=True) as session:
             session.copy_from_runtime(sandbox_path, local_path)
         return f"文件已成功从沙盒复制: {sandbox_path} -> {local_path}"
     except Exception as e:
@@ -148,7 +168,7 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
                         },
                         "local_path": {
                             "type": "string",
-                            "description": "Destination local path."
+                            "description": "Destination local path. Prefer a short file name only (e.g. 'result.png'); it will be resolved relative to the app directory."
                         }
                     },
                     "required": ["sandbox_path", "local_path"]
@@ -264,12 +284,16 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
                                 st.success(f"文件已保存: {file}")
                                 # 如果是图片文件，尝试显示
                                 if file.lower().endswith(('.png', '.jpg', '.jpeg', '.svg', '.gif')):
-                                    # 移除key参数，st.image()不支持该参数
-                                    st.image(file)
+                                    # 移除key参数，st.image()不支持该参数；
+                                    # 无头环境（非 streamlit run）下 Runtime 不存在，降级跳过渲染
+                                    try:
+                                        st.image(file)
+                                    except RuntimeError:
+                                        pass
         
         while True:
             # 更新状态消息
-            status.update(label=f"步骤 {step_counter}: 正在与AI模型交互...", state="running")
+            _update_status(status, label=f"步骤 {step_counter}: 正在与AI模型交互...", state="running")
             
             # 记录发送给模型的请求
             log_model_request(messages, model=MODEL)
@@ -300,7 +324,7 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
                     function_args = json.loads(tool_call.function.arguments)
                     
                     # 更新状态消息，显示当前执行的操作
-                    status.update(label=f"步骤 {step_counter}: 执行操作 - {function_name}", state="running")
+                    _update_status(status, label=f"步骤 {step_counter}: 执行操作 - {function_name}", state="running")
                     step_counter += 1
                     
                     if function_name == "run_code":
@@ -314,7 +338,7 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
                         update_results()  # 实时更新显示代码
                         
                         # 执行代码
-                        status.update(label=f"步骤 {step_counter-1}: 正在执行代码...", state="running")
+                        _update_status(status, label=f"步骤 {step_counter-1}: 正在执行代码...", state="running")
                         result = run_code(lang, code, libraries)
                         all_outputs.append({"type": "result", "content": result})
                         update_results()  # 实时更新显示结果
@@ -329,7 +353,7 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
                     elif function_name == "copy_file_from_sandbox":
                         sandbox_path = function_args.get("sandbox_path")
                         local_path = function_args.get("local_path")
-                        status.update(label=f"步骤 {step_counter-1}: 正在复制文件...", state="running")
+                        _update_status(status, label=f"步骤 {step_counter-1}: 正在复制文件...", state="running")
                         result = copy_file_from_sandbox(sandbox_path, local_path)
                         all_outputs.append({"type": "info", "content": result})
                         generated_files.append(local_path)
@@ -362,7 +386,7 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
                 
                 # 清除初始状态消息并更新状态为完成
                 status_message.empty()
-                status.update(label="处理完成！", state="complete")
+                _update_status(status, label="处理完成！", state="complete")
                 break
     
     # 最终结果已经在实时更新中显示，不需要重复显示
