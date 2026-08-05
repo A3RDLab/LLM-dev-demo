@@ -24,18 +24,24 @@ import argparse
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from langchain_mcp_adapters.tools import load_mcp_tools
-from langgraph.prebuilt import create_react_agent
+
+# LangGraph 1.x 把 create_react_agent 迁到了 langchain.agents.create_agent，
+# 这里做向后兼容：新版优先，老版回退
+try:
+    from langchain.agents import create_agent as create_react_agent
+except ImportError:
+    from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
 # ===== 命令行参数（与仓库其他 demo 保持一致的风格） =====
 parser = argparse.ArgumentParser(description='MCP Client Agent 示例')
-parser.add_argument('--model', type=str, default='Pro/deepseek-ai/DeepSeek-V3',
-                    help='指定使用的模型名称')
+parser.add_argument('--model', type=str, default=os.getenv("MODEL", "Pro/deepseek-ai/DeepSeek-V3"),
+                    help='指定使用的模型名称（默认读环境变量 MODEL）')
 parser.add_argument('--api_key', type=str, default=None,
                     help='指定API密钥（默认使用环境变量API_KEY）')
-parser.add_argument('--base_url', type=str, default="https://api.siliconflow.cn/v1/",
-                    help='指定API基础URL')
+parser.add_argument('--base_url', type=str, default=os.getenv("API_BASE", "https://api.siliconflow.cn/v1/"),
+                    help='指定API基础URL（默认读环境变量 API_BASE）')
 parser.add_argument('--mcp_url', type=str, default="http://localhost:8000/mcp",
                     help='MCP 服务器的 Streamable HTTP 地址')
 parser.add_argument('--query', type=str,
@@ -51,6 +57,10 @@ model = ChatOpenAI(
     base_url=args.base_url,
     temperature=0.2,
 )
+
+# 启动诊断：打印实际生效的配置（Key 只显示长度和前缀，避免泄露）
+print(f"[config] model={args.model} | base_url={args.base_url} | "
+      f"api_key={'未设置!' if not api_key else f'{api_key[:8]}...(长度{len(api_key)})'}")
 
 
 async def main():

@@ -9,7 +9,7 @@ pydantic>=2.7
 langchain-openai>=0.3
 langgraph>=1.0
 langchain-mcp-adapters>=0.1
-mcp[cli]>=1.9
+mcp[cli]>=1.9,<2  # 2.0 移除了 mcp.server.fastmcp 高层封装，教学 demo 依赖 1.x
 
 # RAG 相关（AliyunQA_RAG_demo）
 streamlit>=1.35
