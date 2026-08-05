@@ -7,4 +7,6 @@ agentdemoenv/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+rag_index.npz
+rag_index_meta.json
 
