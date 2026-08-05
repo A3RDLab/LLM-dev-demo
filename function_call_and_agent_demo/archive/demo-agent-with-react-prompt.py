@@ -196,14 +196,14 @@ def call_with_messages(prompt: str) -> str:
     Raises:
         RuntimeError: If the API call fails or returns an error
     """
-    api_key = os.getenv("DASHSCOPE_API_KEY")
+    api_key = os.getenv("API_KEY")
     if not api_key:
-        raise ValueError("DASHSCOPE_API_KEY environment variable is required")
+        raise ValueError("API_KEY environment variable is required")
     
     try:
         client = OpenAI(
             api_key=api_key,
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+            base_url="https://api.siliconflow.cn/v1/"
         )
 
         messages = [{'role': 'system', 'content': 'You is a helpful assistant in software developing.'},
@@ -217,9 +217,10 @@ def call_with_messages(prompt: str) -> str:
         
         # 创建流式请求
         completion = client.chat.completions.create(
-            model="deepseek-v3",
+            model="Qwen/Qwen2.5-Coder-32B-Instruct",
             messages=messages,
-            stream=True
+            stream=True,
+            stop=["Observation:"]
         )
 
         for chunk in completion:
@@ -362,8 +363,8 @@ def run_agent(query: str, max_iterations: int = 10) -> str:
 
 if __name__ == "__main__":
     try:
-        query = "分析https://github.com/shadow1ng/fscan，查看相关源码，告诉我redis系统反弹shell相关的代码在哪里，并解释这些代码的含义。"
-        # query = "https://github.com/ai-shifu/ChatALL 是如何接入OpenAI的？。"
+        # query = "分析https://github.com/shadow1ng/fscan，查看相关源码，告诉我redis系统反弹shell相关的代码在哪里，并解释这些代码的含义。"
+        query = "https://github.com/ai-shifu/ChatALL 是如何接入OpenAI的？。"
         final_answer = run_agent(query)
         print(f"\nFinal Answer:\n{final_answer}")
     except Exception as e:

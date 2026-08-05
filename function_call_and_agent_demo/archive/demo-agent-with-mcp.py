@@ -12,7 +12,7 @@ api_key = os.getenv("API_KEY")
 if not api_key:
     raise ValueError("API_KEY environment variable is required")
 
-model = ChatOpenAI(model="Pro/deepseek-ai/DeepSeek-V3", api_key=api_key, base_url="https://api.siliconflow.cn/v1/", temperature=0.5)
+model = ChatOpenAI(model="deepseek-chat", api_key=api_key, base_url="https://api.deepseek.com/v1", temperature=0.5)
 
 server_params = StdioServerParameters(
     command="npx",
@@ -77,7 +77,8 @@ async def main():
 3. 分析项目时，建议先查看根目录结构，再根据需要深入特定目录
 4. 对于开源项目，优先查看README.md、docs/目录和主要源代码目录"""), # 添加system message
                     # HumanMessage(content="分析https://github.com/shadow1ng/fscan，查看相关源码，告诉我redis系统反弹shell相关的代码在哪里，并解释这些代码的含义。")
-                    HumanMessage(content="https://github.com/LI-Mingyu/cndevtutorial 中 GRAPE-operator 是如何实现 TTL 的？")
+                    # HumanMessage(content="https://github.com/LI-Mingyu/cndevtutorial 中 GRAPE-operator 是如何实现 TTL 的？")
+                    HumanMessage(content="https://github.com/ai-shifu/ChatALL 是如何接入OpenAI的？")
                 ]
             }
 
