@@ -1,5 +1,10 @@
 agentdemoenv/
+.venv*/
 .DS_Store
 .continue/
 *.png
+.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
 

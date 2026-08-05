@@ -1,8 +1,9 @@
+import os
 from openai import OpenAI
 
 print("Code Fim by:")
 print("siliconflow + v3")
-client = OpenAI(api_key="sk-lyczdgelbgsbknxvlbqaxpeodwkpzaxsnyqdilfnfizkbtif", base_url="https://api.siliconflow.cn/v1/")
+client = OpenAI(api_key=os.getenv("SILICONFLOW_API_KEY"), base_url="https://api.siliconflow.cn/v1/")
 
 response = client.completions.create(
     model="Pro/deepseek-ai/DeepSeek-V3",
@@ -23,7 +24,7 @@ print(response.choices[0].text)
 
 print("===============")
 print("dashscope + qwen-coder")
-client = OpenAI(api_key="sk-3f13933b10bb4992b16b667f5ea26124", base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
+client = OpenAI(api_key=os.getenv("DASHSCOPE_API_KEY"), base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
 
 response = client.completions.create(
     model="qwen2.5-coder-7b-instruct",
