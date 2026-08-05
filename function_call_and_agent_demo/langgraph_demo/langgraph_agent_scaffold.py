@@ -27,12 +27,12 @@ from langgraph.prebuilt import create_react_agent, ToolNode, tools_condition
 
 # ===== 1. 命令行参数（与仓库其他 demo 保持一致的风格） =====
 parser = argparse.ArgumentParser(description='LangGraph Agent 示例')
-parser.add_argument('--model', type=str, default='Pro/deepseek-ai/DeepSeek-V3',
-                    help='指定使用的模型名称')
+parser.add_argument('--model', type=str, default=os.getenv("MODEL", "Pro/deepseek-ai/DeepSeek-V3"),
+                    help='指定使用的模型名称（默认读环境变量 MODEL）')
 parser.add_argument('--api_key', type=str, default=None,
                     help='指定API密钥（默认使用环境变量API_KEY）')
-parser.add_argument('--base_url', type=str, default="https://api.siliconflow.cn/v1/",
-                    help='指定API基础URL')
+parser.add_argument('--base_url', type=str, default=os.getenv("API_BASE", "https://api.siliconflow.cn/v1/"),
+                    help='指定API基础URL（默认读环境变量 API_BASE）')
 parser.add_argument('--query', type=str,
                     default='北京和上海今天的天气怎么样？如果北京更热，帮我算一下北京气温的华氏度是多少',
                     help='测试用问题')
