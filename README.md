@@ -32,6 +32,7 @@ export DASHSCOPE_API_KEY=<阿里云百炼 Key>
 |---|---|
 | `function_call_and_agent_demo/demo-agent-with-tools-arg.py` | 入门：原生 function calling + 手写调用循环（GitHub 仓库分析场景） |
 | `function_call_and_agent_demo/langgraph_demo/` | 进阶：LangGraph 图编排，手搓 StateGraph vs `create_react_agent` 对比 |
+| `function_call_and_agent_demo/agent_harness_demo/` | 进阶：Agent Harness（DeepAgents）+ Agent Skills 渐进式披露，接入 anthropics/skills 现成 Skill |
 | `function_call_and_agent_demo/mcp_server_demo.py` + `mcp_client_agent_demo.py` | MCP 协议：FastMCP 服务端 + Streamable HTTP 客户端 agent |
 | `function_call_and_agent_demo/excel-process/` | Streamlit + 代码沙箱的 Excel 处理应用（独立依赖，见其 requirements.txt） |
 | `function_call_and_agent_demo/archive/` | 已归档的历史写法（手写 ReAct prompt 等），附归档原因说明 |
@@ -56,7 +57,7 @@ export DASHSCOPE_API_KEY=<阿里云百炼 Key>
 ## 推荐学习路线
 
 1. **基础**：`first_llm_call.py` → `first_llm_app.py` → `structured_output_demo.py`
-2. **Agent**：`demo-agent-with-tools-arg.py` → `langgraph_demo` → MCP demo
+2. **Agent**：`demo-agent-with-tools-arg.py` → `langgraph_demo` → `agent_harness_demo`（Agent Harness + Skills）→ MCP demo
 3. **RAG**：`AliyunQA_RAG_demo`（召回+重排全链路）→ `PDF_RAG_demo`
 4. **综合**：`finance_doc_review/`
 

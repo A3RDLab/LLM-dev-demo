@@ -1,0 +1,3 @@
+# 运行时产物（agent 生成的报告与 Excel）
+output/
+report.md

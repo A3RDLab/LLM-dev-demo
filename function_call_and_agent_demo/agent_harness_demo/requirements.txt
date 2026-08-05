@@ -1,0 +1,10 @@
+# Agent Harness 演示（DeepAgents + Agent Skills）
+# 独立依赖，不与根目录 requirements.txt 混装
+
+deepagents>=0.7
+langchain-openai>=0.3
+python-dotenv>=1.0
+
+# execute_python 工具运行环境所需（agent 分析 Excel 时使用）
+pandas>=2.0
+openpyxl>=3.1
