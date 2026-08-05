@@ -8,11 +8,14 @@
 
 与前置 demo 的递进关系：`demo-agent-with-tools-arg.py`（手写调用循环）→ `langgraph_demo/`（手搓图编排）→ **本 demo（框架化的完整 harness）**。
 
+📋 **分步实验指南见 [实验指南.md](实验指南.md)**：四个递进实验（端到端跑通 → Skill 路由负例 → 自定义数据源 → 与手写循环对照）+ 常见问题排查。
+
 ## 目录结构
 
 ```
 agent_harness_demo/
 ├── agent_harness_demo.py   # 主脚本
+├── 实验指南.md             # 分步实验手册（建议按此顺序上手）
 ├── skills/xlsx/            # 现成 Skill（来自 anthropics/skills，完整未裁剪，见下方说明）
 │   ├── SKILL.md            # Skill 指令主体（frontmatter + 正文）
 │   ├── LICENSE.txt
