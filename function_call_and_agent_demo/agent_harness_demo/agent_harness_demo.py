@@ -35,7 +35,21 @@ from deepagents.backends.filesystem import FilesystemBackend
 
 load_dotenv()
 
+# Windows 控制台默认 GBK 编码，打印中文轨迹会 UnicodeEncodeError，强制 UTF-8
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 HERE = Path(__file__).resolve().parent          # backend 根目录 = 本 demo 目录
+
+# Windows 上 LibreOffice 默认不注册 PATH（winget 安装亦然），探测常见安装位置补进去，
+# 使 skill 的 recalc.py 能直接找到 soffice.exe；macOS/Linux 上 soffice 通常已在 PATH，此步无害
+if sys.platform == "win32":
+    for _p in (r"C:\Program Files\LibreOffice\program",
+               r"C:\Program Files (x86)\LibreOffice\program"):
+        if Path(_p, "soffice.exe").exists() and _p not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = _p + os.pathsep + os.environ.get("PATH", "")
+            break
 DEFAULT_TASK = (
     "分析 data/ 中的销售记录 Excel，按 xlsx skill 的规范生成一份分析报告：\n"
     "1) 先用 pandas 读取并摸清数据结构（列、行数、时间范围）；\n"
@@ -53,7 +67,8 @@ SYSTEM_PROMPT = """你是一个数据分析 agent，运行在 harness 提供的�
 - 执行 Python 代码使用 execute_python 工具。环境中已预装 pandas 与 openpyxl。
 - skill 自带的脚本（如 skills/xlsx/scripts/recalc.py）是完整可执行的：
   在 execute_python 中用 subprocess 运行，注意脚本内部导入约定要求 cwd 切到
-  skills/xlsx/scripts/（如 subprocess.run(['python3', 'recalc.py', <文件绝对路径>], cwd='skills/xlsx/scripts')）。
+  skills/xlsx/scripts/（如 subprocess.run(['python3', 'recalc.py', <文件绝对路径>], cwd='skills/xlsx/scripts')；
+  Windows 上解释器用 sys.executable，并在 env 中设 PYTHONUTF8=1）。
   产出带公式的 Excel 后必须按其规范执行重算校验，并根据返回的 JSON 修正问题。
 """
 
@@ -64,6 +79,8 @@ def execute_python(code: str) -> str:
 
     用于数据分析（读写 Excel、统计计算等）。代码的工作目录即 harness 工作目录，
     可以用相对路径访问 data/ 与 output/。已预装 pandas、openpyxl。
+    在 Windows 上运行子进程（如 skill 的 recalc.py）时，请在 env 中设置 PYTHONUTF8=1
+    以避免控制台编码导致的输出乱码。
     """
     stdout, stderr = io.StringIO(), io.StringIO()
     prev_cwd = os.getcwd()
