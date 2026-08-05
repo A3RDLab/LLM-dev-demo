@@ -12,11 +12,18 @@ from logger import log_model_request, log_model_response, log_tool_result
 # 加载环境变量
 load_dotenv()
 
-# 初始化 OpenAI 客户端
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    base_url=os.getenv("OPENAI_API_BASE")
-)
+# 模型配置（与仓库其他 demo 保持一致的环境变量命名，见 .env.example）
+MODEL = os.getenv("MODEL", "Pro/deepseek-ai/DeepSeek-V3")
+
+def get_client() -> OpenAI:
+    """惰性创建 OpenAI 客户端，缺少 API Key 时给出明确报错"""
+    api_key = os.getenv("API_KEY")
+    if not api_key:
+        raise ValueError("缺少 API_KEY：请复制 .env.example 为 .env 并填入你的 API Key")
+    return OpenAI(
+        api_key=api_key,
+        base_url=os.getenv("API_BASE", "https://api.siliconflow.cn/v1/")
+    )
 
 # 设置页面配置
 st.set_page_config(
@@ -35,7 +42,8 @@ def run_code(lang: str, code: str, libraries: Optional[List] = None) -> str:
     在沙盒环境中运行代码
     """
     with SandboxSession(lang=lang, verbose=False, keep_template=True) as session:
-        result = session.run(code, libraries).text
+        # 新版 llm-sandbox 的 .text 已废弃，改用 .stdout
+        result = session.run(code, libraries).stdout
         if not result or result.strip() == '':
             return "执行成功，但没有输出结果。请尝试添加print语句来显示结果。"
         return result
@@ -43,9 +51,17 @@ def run_code(lang: str, code: str, libraries: Optional[List] = None) -> str:
 def copy_file_to_sandbox(local_path: str, sandbox_path: str) -> str:
     """
     将本地文件复制到沙盒环境中
+
+    注意两点（均为实测验证过的坑）：
+    1. copy_to_runtime 的目标必须是【完整文件路径】，传目录会把文件解压到错误位置
+    2. 沙盒会话关闭后容器即销毁，必须 commit_container=True 把容器状态提交进
+       模板镜像，后续会话才能看到该文件
     """
     try:
-        with SandboxSession(lang="python", keep_template=True) as session:
+        # 目标是目录（以 / 结尾）时，自动补全为完整文件路径
+        if sandbox_path.endswith('/'):
+            sandbox_path = sandbox_path + os.path.basename(local_path)
+        with SandboxSession(lang="python", keep_template=True, commit_container=True) as session:
             session.copy_to_runtime(local_path, sandbox_path)
         return f"文件已成功复制到沙盒: {local_path} -> {sandbox_path}"
     except Exception as e:
@@ -66,6 +82,7 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
     """
     使用 OpenAI SDK 调用大模型并执行工具调用
     """
+    client = get_client()
     # 定义工具
     tools = [
         {
@@ -110,7 +127,7 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
                         },
                         "sandbox_path": {
                             "type": "string",
-                            "description": "Destination path in sandbox."
+                            "description": "Full destination file path in sandbox, e.g. /sandbox/data.xlsx"
                         }
                     },
                     "required": ["local_path", "sandbox_path"]
@@ -162,8 +179,8 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
         # 构建完整的沙盒路径（仅用于告知模型）
         sandbox_excel_path = os.path.join(sandbox_dir, excel_filename)
         
-        # 调用复制函数时只传递目录路径
-        copy_result = copy_file_to_sandbox(excel_file_path, sandbox_dir)
+        # 调用复制时传入完整的沙盒文件路径（目录路径会导致文件解压到错误位置）
+        copy_result = copy_file_to_sandbox(excel_file_path, sandbox_excel_path)
         st.info(copy_result)
         
         # 提取Excel文件的前几行数据
@@ -255,10 +272,10 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
             status.update(label=f"步骤 {step_counter}: 正在与AI模型交互...", state="running")
             
             # 记录发送给模型的请求
-            log_model_request(messages, model="deepseek-ai/DeepSeek-V3")
+            log_model_request(messages, model=MODEL)
             
             response = client.chat.completions.create(
-                model="deepseek-ai/DeepSeek-V3",  # 可以根据需要更换为其他模型
+                model=MODEL,
                 messages=messages,
                 tools=tools,
                 tool_choice="auto"
@@ -268,7 +285,7 @@ def run_agent(user_input: str, excel_file_path: Optional[str] = None):
             messages.append(response_message)
             
             # 记录模型的响应
-            log_model_response(response_message, model="deepseek-ai/DeepSeek-V3")
+            log_model_response(response_message, model=MODEL)
             
             # 记录大模型的输出并实时显示
             if response_message.content:
