@@ -25,9 +25,7 @@ export DASHSCOPE_API_KEY=<阿里云百炼 Key>
 |---|---|
 | `first_llm_call.py` | 最简单的单次调用 |
 | `first_llm_app.py` | 流式多轮对话，含推理模型思考过程展示 |
-| `first_langchain_app.py` | 同上的 LangChain 版本 |
 | `structured_output_demo.py` | **结构化输出**：json_schema 约束 + Pydantic 校验，信息抽取场景 |
-| `code_fim.py` | 代码补全（FIM，prefix/suffix 模式） |
 
 ### Agent / Function Calling（推荐学习顺序）
 | Demo | 说明 |
