@@ -1,0 +1,72 @@
+# 信贷资料审核规则集（声明式）
+# 规则引擎逐条评估，结论确定性可解释；业务人员可直接增删改规则，无需改代码。
+#
+# 支持的规则类型（type）：
+#   required     —— fields 中的字段必须非空
+#   threshold    —— 数值字段与 value 比较，op 取 <= / >= / < / > / ==
+#   regex        —— 字符串字段必须匹配 pattern
+#   enum         —— 字段取值必须在 values 集合内
+#   sum_equals   —— 列表字段中各元素的 sub_field 之和须等于 value（容差 tolerance）
+
+rules:
+  - id: R001
+    name: 合同主体与要素完整性
+    type: required
+    severity: critical
+    fields: [borrower, borrower_id, principal, annual_rate, term_months, signed_date]
+    message: 缺失必备要素，合同要件不完整
+
+  - id: R002
+    name: 年化利率不超过司法保护上限（4 倍 LPR，按 LPR=3.0% 计为 12%）
+    type: threshold
+    severity: critical
+    field: annual_rate
+    op: "<="
+    value: 12.0
+    message: 年化利率超出民间借贷司法保护上限
+
+  - id: R003
+    name: 逾期罚息不超过合同利率的 1.5 倍
+    type: threshold
+    severity: warning
+    field: late_fee_rate
+    op: "<="
+    ref_field: annual_rate
+    ref_multiplier: 1.5
+    message: 逾期罚息过高，存在被认定为变相高利贷的风险
+
+  - id: R004
+    name: 证件号格式合法（18 位身份证或 18 位统一社会信用代码）
+    type: regex
+    severity: warning
+    field: borrower_id
+    pattern: "^([0-9]{17}[0-9Xx]|[0-9A-HJ-NPQRTUWXY]{18})$"
+    message: 借款人证件号格式不合法
+
+  - id: R005
+    name: 借款期限下限为 1 个月
+    type: threshold
+    severity: warning
+    field: term_months
+    op: ">="
+    value: 1
+    message: 借款期限异常（过短）
+
+  - id: R006
+    name: 借款期限上限为 120 个月
+    type: threshold
+    severity: warning
+    field: term_months
+    op: "<="
+    value: 120
+    message: 借款期限异常（过长）
+
+  - id: R007
+    name: 分期还款计划占比合计须为 100%
+    type: sum_equals
+    severity: warning
+    field: repayment_schedule
+    sub_field: percentage
+    value: 100.0
+    tolerance: 0.01
+    message: 还款计划各期占比之和不等于 100%，资金安排存在缺口
