@@ -145,7 +145,8 @@ SYSTEM_PROMPT = """你是一个阿里云运维助手。请严格依据【参考�
 
 def generate(query: str, hits) -> str:
     context = "\n\n".join(f"[资料{i + 1}]（相关度{score:.3f}）\n{chunk}" for i, (chunk, _, score) in enumerate(hits))
-    resp = client.chat.completions.create(
+    # stream=True：回答逐 token 生成，边收边打印，避免长回答下干等完整响应
+    stream = client.chat.completions.create(
         model=args.model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -153,8 +154,16 @@ def generate(query: str, hits) -> str:
         ],
         temperature=0.3,
         max_tokens=1500,
+        stream=True,
     )
-    return resp.choices[0].message.content
+    chunks = []
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content if chunk.choices else None
+        if delta:
+            print(delta, end="", flush=True)
+            chunks.append(delta)
+    print()  # 流式输出结束后换行
+    return "".join(chunks)
 
 
 def answer(query: str, vecs, chunks, urls, top_k: int):
@@ -163,8 +172,7 @@ def answer(query: str, vecs, chunks, urls, top_k: int):
     for i, (chunk, url, score) in enumerate(hits):
         print(f"  #{i + 1} 相关度 {score:.3f} | {chunk[:60]}... | {url[:70]}")
     print("\n[生成回答]")
-    ans = generate(query, hits)
-    print(ans)
+    ans = generate(query, hits)  # 回答已在 generate 内流式打印
     return ans
 
 

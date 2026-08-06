@@ -112,7 +112,12 @@ available_functions = {
 }
 
 def call_with_messages(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Make an API call to the LLM with tool support."""
+    """Make a streaming API call to the LLM with tool support.
+
+    流式要点：content 片段实时逐字打印（最终答案打字机效果）；
+    tool_calls 片段按 index 归位累积——首个片段携带 id 与函数名，
+    后续片段只是 arguments 的文本碎片。返回结构与非流式 message 等价。
+    """
     api_key = os.getenv("API_KEY")
     if not api_key:
         raise ValueError("API_KEY environment variable is required")
@@ -123,20 +128,50 @@ def call_with_messages(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     )
 
     try:
-        response = client.chat.completions.create(
+        stream = client.chat.completions.create(
             model=os.getenv("MODEL", "Pro/deepseek-ai/DeepSeek-V3"),
             messages=messages,
             tools=TOOLS,
-            temperature=0.5
+            temperature=0.5,
+            stream=True
         )
-        return response.choices[0].message
+        content_parts = []
+        tool_calls = {}  # index -> 累积中的工具调用
+        answer_started = False
+
+        for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta is None:
+                continue
+            if delta.content:
+                if not answer_started:
+                    print("\nFinal Answer (streaming):", flush=True)
+                    answer_started = True
+                print(delta.content, end="", flush=True)
+                content_parts.append(delta.content)
+            for tc in delta.tool_calls or []:
+                acc = tool_calls.setdefault(tc.index, {"id": "", "function": {"name": "", "arguments": ""}})
+                if tc.id:
+                    acc["id"] = tc.id
+                if tc.function and tc.function.name:
+                    acc["function"]["name"] = tc.function.name
+                if tc.function and tc.function.arguments:
+                    acc["function"]["arguments"] += tc.function.arguments
+
+        if answer_started:
+            print()  # 流式回答结束补个换行
+        return {
+            "role": "assistant",
+            "content": "".join(content_parts) or None,
+            "tool_calls": [dict(tool_calls[i], type="function") for i in sorted(tool_calls)] or None,
+        }
     except Exception as e:
         raise RuntimeError(f"Failed to communicate with LLM: {str(e)}")
 
 def execute_function(tool_call: Dict[str, Any]) -> str:
     """Execute a function based on tool call."""
-    function_name = tool_call.function.name
-    function_args = json.loads(tool_call.function.arguments)
+    function_name = tool_call["function"]["name"]
+    function_args = json.loads(tool_call["function"]["arguments"])
     
     if function_name in available_functions:
         logger.debug(f"Executing function: {function_name} with args: {function_args}")
@@ -166,35 +201,35 @@ def run_agent(query: str, max_iterations: int = 10) -> str:
                 logger.info(f"{msg['role'].capitalize()}: {_preview(msg['content'])}")
             
             response = call_with_messages(messages)
-            logger.info(f"Received LLM response: {_preview(response.content)} | tool_calls: {len(response.tool_calls or [])} 个")
+            logger.info(f"Received LLM response: {_preview(response['content'])} | tool_calls: {len(response['tool_calls'] or [])} 个")
             
-            if not response.tool_calls:
-                # No tool calls, return the final answer
+            if not response["tool_calls"]:
+                # No tool calls, final answer has already been streamed to console
                 logger.info("No tool calls detected, returning final answer")
-                return response.content
+                return response["content"]
             
             # Handle tool calls
-            if response.tool_calls:
-                logger.info(f"Received {len(response.tool_calls)} tool calls")
-                for i, tool_call in enumerate(response.tool_calls):
-                    logger.info(f"Tool call {i+1}: {tool_call.function.name} with args: {tool_call.function.arguments}")
+            if response["tool_calls"]:
+                logger.info(f"Received {len(response['tool_calls'])} tool calls")
+                for i, tool_call in enumerate(response["tool_calls"]):
+                    logger.info(f"Tool call {i+1}: {tool_call['function']['name']} with args: {tool_call['function']['arguments']}")
                 
                 # First add the assistant message with tool calls
                 messages.append({
-                    "role": response.role,
-                    "content": response.content,
-                    "tool_calls": response.tool_calls
+                    "role": response["role"],
+                    "content": response["content"],
+                    "tool_calls": response["tool_calls"]
                 })
                 
                 # Then add tool responses
-                for tool_call in response.tool_calls:
+                for tool_call in response["tool_calls"]:
                     function_response = execute_function(tool_call)
-                    logger.info(f"Tool execution result for {tool_call.function.name}: {_preview(function_response, 200)}")
+                    logger.info(f"Tool execution result for {tool_call['function']['name']}: {_preview(function_response, 200)}")
                     messages.append({
                         "role": "tool",
                         "content": function_response,
-                        "tool_call_id": tool_call.id,
-                        "name": tool_call.function.name
+                        "tool_call_id": tool_call["id"],
+                        "name": tool_call["function"]["name"]
                     })
             
             iteration += 1
@@ -213,8 +248,7 @@ if __name__ == "__main__":
         query = "https://github.com/ai-shifu/ChatALL 是如何接入OpenAI的？"
         logger.info(f"Starting agent with query: {query}")
         final_answer = run_agent(query)
-        logger.info(f"Agent completed successfully with final answer")
-        print(f"\nFinal Answer:\n{final_answer}")
+        logger.info(f"Agent completed successfully with final answer ({len(final_answer or '')} chars, already streamed to console)")
     except Exception as e:
         logger.error(f"Agent failed with error: {str(e)}")
         print(f"Error: {str(e)}")

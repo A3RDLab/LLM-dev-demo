@@ -149,25 +149,66 @@ def make_tool_handlers(kb_dir: Path):
 
 # ----------------------------------------------------------- Agent 主循环
 
+def stream_completion(client: OpenAI, model: str, messages: list) -> dict:
+    """流式接收一轮模型输出，累积成一条完整的 assistant 消息。
+
+    关键技巧：stream 模式下 content 与 tool_calls 都是增量片段（delta），
+    - content 片段直接逐字打印（打字机效果），同时累积；
+    - tool_calls 片段按 index 归位：首个片段携带 id 与函数名，
+      后续片段只是 arguments 的文本碎片，逐个拼接。
+    """
+    stream = client.chat.completions.create(
+        model=model, messages=messages, tools=TOOLS, stream=True)
+    content_parts: list[str] = []
+    tool_calls: dict[int, dict] = {}  # index -> 累积中的工具调用
+    answer_started = False
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta if chunk.choices else None
+        if delta is None:
+            continue
+        if delta.content:  # 最终回答的文字片段：边收边打印
+            if not answer_started:  # 首个片段到达才打标签，避免工具轮日志接在标签后
+                print("\n助手: ", end="", flush=True)
+                answer_started = True
+            print(delta.content, end="", flush=True)
+            content_parts.append(delta.content)
+        for tc in delta.tool_calls or []:
+            acc = tool_calls.setdefault(tc.index, {"id": "", "function": {"name": "", "arguments": ""}})
+            if tc.id:
+                acc["id"] = tc.id
+            if tc.function and tc.function.name:
+                acc["function"]["name"] = tc.function.name
+            if tc.function and tc.function.arguments:
+                acc["function"]["arguments"] += tc.function.arguments
+
+    if content_parts:  # 流式回答结束补个换行
+        print()
+    return {
+        "role": "assistant",
+        "content": "".join(content_parts),
+        "tool_calls": [dict(tool_calls[i], type="function") for i in sorted(tool_calls)] or None,
+    }
+
+
 def run_agent(client: OpenAI, model: str, handlers: dict, messages: list[dict]) -> str:
     """一次用户提问的完整处理：循环执行 模型决策 → 工具执行 → 结果回填。"""
     for _ in range(MAX_TOOL_ROUNDS):
-        resp = client.chat.completions.create(model=model, messages=messages, tools=TOOLS)
-        msg = resp.choices[0].message
+        msg = stream_completion(client, model, messages)
         messages.append(msg)
 
-        if not msg.tool_calls:  # 模型给出最终答案
-            return msg.content or ""
+        if not msg["tool_calls"]:  # 模型给出最终答案（已在 stream_completion 中流式打印）
+            return msg["content"]
 
         # 执行模型要求的所有工具调用，结果以 role=tool 回填
-        for call in msg.tool_calls:
-            fn = handlers.get(call.function.name)
-            args = json.loads(call.function.arguments or "{}")
-            print(f"  🔧 调用工具 {call.function.name}({args})")
-            result = fn(**args) if fn else f"未知工具：{call.function.name}"
+        for call in msg["tool_calls"]:
+            fn = handlers.get(call["function"]["name"])
+            args = json.loads(call["function"]["arguments"] or "{}")
+            print(f"  🔧 调用工具 {call['function']['name']}({args})")
+            result = fn(**args) if fn else f"未知工具：{call['function']['name']}"
             messages.append({
                 "role": "tool",
-                "tool_call_id": call.id,
+                "tool_call_id": call["id"],
                 "content": result,
             })
     return "（达到最大工具调用轮数，中止）"
@@ -196,7 +237,8 @@ def main():
 
     if args.once:
         messages.append({"role": "user", "content": args.once})
-        print(run_agent(client, args.model, handlers, messages))
+        # 最终回答已在 run_agent 内流式打印，这里不再重复输出
+        run_agent(client, args.model, handlers, messages)
         return
 
     print("进入对话（输入 exit 或回车退出）")
@@ -205,8 +247,8 @@ def main():
         if not user_input or user_input.lower() == "exit":
             break
         messages.append({"role": "user", "content": user_input})
-        answer = run_agent(client, args.model, handlers, messages)
-        print(f"\n助手: {answer}")
+        # 工具轮与最终回答均在 run_agent 内实时打印（回答为逐字流式）
+        run_agent(client, args.model, handlers, messages)
 
 
 if __name__ == "__main__":

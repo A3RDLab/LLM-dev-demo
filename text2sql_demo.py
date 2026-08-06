@@ -104,6 +104,46 @@ def execute_sql(sql: str) -> str:
 
 
 # ===== 3. Agent 循环：决策 → 执行 → 回填 → 再决策 =====
+def stream_chat(messages):
+    """流式接收一轮模型输出，累积成一条完整的 assistant 消息。
+
+    流式要点：content 片段逐字打印（最终回答打字机效果）；
+    tool_calls 片段按 index 归位——首个片段携带 id 与函数名，
+    后续片段只是 arguments 的文本碎片，逐个拼接。
+    """
+    stream = client.chat.completions.create(
+        model=args.model, messages=messages, tools=TOOLS, temperature=0.1, stream=True)
+    content_parts = []
+    tool_calls = {}  # index -> 累积中的工具调用
+    answer_started = False
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta if chunk.choices else None
+        if delta is None:
+            continue
+        if delta.content:
+            if not answer_started:  # 首个片段到达才打标签，避免工具轮日志接在标签后
+                print("[最终回答]")
+                answer_started = True
+            print(delta.content, end="", flush=True)
+            content_parts.append(delta.content)
+        for tc in delta.tool_calls or []:
+            acc = tool_calls.setdefault(tc.index, {"id": "", "function": {"name": "", "arguments": ""}})
+            if tc.id:
+                acc["id"] = tc.id
+            if tc.function and tc.function.name:
+                acc["function"]["name"] = tc.function.name
+            if tc.function and tc.function.arguments:
+                acc["function"]["arguments"] += tc.function.arguments
+
+    if answer_started:  # 流式回答结束补个换行
+        print()
+    return {
+        "content": "".join(content_parts),
+        "tool_calls": [dict(tool_calls[i], type="function") for i in sorted(tool_calls)] or None,
+    }
+
+
 def run(query: str, schema: str, max_rounds: int = 5):
     messages = [
         {"role": "system", "content": f"""你是数据分析师，负责把用户的自然语言问题转换为 SQL 查询 Chinook 数据库。
@@ -117,25 +157,21 @@ def run(query: str, schema: str, max_rounds: int = 5):
 
     for round_no in range(1, max_rounds + 1):
         print(f"\n── 第 {round_no} 轮 ──")
-        resp = client.chat.completions.create(
-            model=args.model, messages=messages, tools=TOOLS, temperature=0.1)
-        msg = resp.choices[0].message
+        msg = stream_chat(messages)
 
-        if not msg.tool_calls:
-            print("[最终回答]")
-            print(msg.content)
-            return msg.content
+        if not msg["tool_calls"]:
+            return msg["content"]  # 最终回答已在 stream_chat 内逐字流式打印
 
         # 把 assistant 的工具调用消息追加回历史（保持消息序列合法）
-        messages.append({"role": "assistant", "content": msg.content,
-                         "tool_calls": [tc.model_dump() for tc in msg.tool_calls]})
+        messages.append({"role": "assistant", "content": msg["content"],
+                         "tool_calls": msg["tool_calls"]})
 
-        for tc in msg.tool_calls:
-            sql = json.loads(tc.function.arguments)["sql"]
+        for tc in msg["tool_calls"]:
+            sql = json.loads(tc["function"]["arguments"])["sql"]
             print(f"[执行 SQL] {sql}")
             result = execute_sql(sql)
             print(f"[查询结果] {result[:300]}{'...' if len(result) > 300 else ''}")
-            messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+            messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
 
     raise RuntimeError(f"超过 {max_rounds} 轮仍未得到最终回答")
 

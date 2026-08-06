@@ -80,6 +80,7 @@ MESSAGES = [
 ]
 
 # ===== 4. 发起请求：优先 json_schema 严格模式，不支持时自动降级为 json_object =====
+# 两种模式都开 stream=True：JSON 同样逐 token 生成，流式打印与前面实验保持一致的体验
 from openai import BadRequestError
 
 # 关键经验：思考模型开思考模式做结构化输出容易失控（思考流与 JSON 约束打架，
@@ -87,7 +88,7 @@ from openai import BadRequestError
 EXTRA_BODY = {"enable_thinking": False}
 
 try:
-    completion = client.chat.completions.create(
+    stream = client.chat.completions.create(
         model=args.model,
         messages=MESSAGES,
         response_format={
@@ -102,31 +103,43 @@ try:
         extra_body=EXTRA_BODY,
         max_tokens=2000,
         temperature=0.2,
+        stream=True,
     )
     mode = "json_schema 严格模式（服务端保证符合 Schema）"
 except BadRequestError as e:
     # 部分部署只支持 json_object：只保证输出是合法 JSON，不保证符合 Schema，
     # 结构正确性完全依赖后面的 Pydantic 校验兑底
     print(f"[服务端不支持 json_schema，降级为 json_object 宽松模式]\n{str(e)[:120]}...\n")
-    completion = client.chat.completions.create(
+    stream = client.chat.completions.create(
         model=args.model,
         messages=MESSAGES,
         response_format={"type": "json_object"},
         extra_body=EXTRA_BODY,
         max_tokens=2000,
         temperature=0.2,
+        stream=True,
     )
     mode = "json_object 宽松模式（仅保证合法 JSON）"
 
-raw = completion.choices[0].message.content
+# ===== 5. 流式接收 JSON：边生成边打印，同时累积完整文本 =====
+# delta.content 里流出的就是 JSON 文本片段，与非流式调用相比只是把
+# “生成完一次性返回”变成“逐块返回”，最终内容完全一致
+print(f"=== 流式生成 JSON（{mode}） ===")
+chunks = []
+for chunk in stream:
+    delta = chunk.choices[0].delta.content if chunk.choices else None
+    if delta:
+        print(delta, end="", flush=True)
+        chunks.append(delta)
+print("\n")
+raw = "".join(chunks)
 
-# ===== 5. 解析并用 Pydantic 校验（宽松模式下这一步是结构正确性的唯一防线） =====
+# ===== 6. 解析并用 Pydantic 校验（宽松模式下这一步是结构正确性的唯一防线） =====
+# 注意：不能因为“流式看着输出了”就跳过校验——中途的片段大多不是合法 JSON，
+# 结构正确性仍以这里的完整校验为准
 result = ExtractionResult.model_validate_json(raw)
 
-print(f"=== 原始 JSON（{mode}） ===")
-print(json.dumps(json.loads(raw), ensure_ascii=False, indent=2))
-
-print("\n=== Pydantic 对象（可直接用于后续业务逻辑） ===")
+print("=== Pydantic 对象（可直接用于后续业务逻辑） ===")
 print(f"公司: {result.company}")
 print(f"摘要: {result.summary}")
 for c in result.contacts:
