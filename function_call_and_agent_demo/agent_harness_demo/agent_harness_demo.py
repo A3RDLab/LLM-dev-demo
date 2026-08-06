@@ -33,7 +33,10 @@ from langchain_openai import ChatOpenAI
 from deepagents import create_deep_agent
 from deepagents.backends.filesystem import FilesystemBackend
 
-load_dotenv()
+# 显式加载仓库根目录 .env（API_KEY / API_BASE / MODEL），避免依赖运行时的 cwd
+_HERE = Path(__file__).resolve().parent
+load_dotenv(_HERE.parent.parent / ".env")
+load_dotenv(_HERE / ".env")
 
 # Windows 控制台默认 GBK 编码，打印中文轨迹会 UnicodeEncodeError，强制 UTF-8
 for _stream in (sys.stdout, sys.stderr):
@@ -143,12 +146,12 @@ def run(agent, task):
 
 def main():
     parser = argparse.ArgumentParser(description='Agent Harness 演示（DeepAgents + Skills）')
-    parser.add_argument('--model', type=str, default='Pro/deepseek-ai/DeepSeek-V3',
-                        help='模型名（默认硅基流动的 DeepSeek-V3）')
+    parser.add_argument('--model', type=str, default=os.getenv("MODEL", "Pro/deepseek-ai/DeepSeek-V3"),
+                        help='模型名（默认读环境变量 MODEL）')
     parser.add_argument('--api_key', type=str, default=None,
                         help='API Key（默认读环境变量 API_KEY）')
-    parser.add_argument('--base_url', type=str, default="https://api.siliconflow.cn/v1/",
-                        help='OpenAI 兼容端点（默认硅基流动）')
+    parser.add_argument('--base_url', type=str, default=os.getenv("API_BASE", "https://api.siliconflow.cn/v1/"),
+                        help='OpenAI 兼容端点（默认读环境变量 API_BASE）')
     parser.add_argument('--task', type=str, default=DEFAULT_TASK, help='演示任务描述')
     args = parser.parse_args()
     args.api_key = args.api_key or os.getenv("API_KEY")

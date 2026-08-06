@@ -1,10 +1,16 @@
 import os
 import logging
+from pathlib import Path
+
+from dotenv import load_dotenv
 from github import Github
 import json
 from http import HTTPStatus
 from openai import OpenAI
 from typing import Tuple, List, Dict, Any
+
+# 加载仓库根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 logging.basicConfig(
     level=logging.INFO,

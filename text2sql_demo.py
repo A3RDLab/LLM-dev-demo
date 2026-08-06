@@ -20,11 +20,15 @@ import os
 import json
 import sqlite3
 import argparse
+from pathlib import Path
 
+from dotenv import load_dotenv
 from openai import OpenAI
 
 # ===== 配置 =====
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 加载项目根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
+load_dotenv(Path(SCRIPT_DIR) / ".env")
 DB_PATH = os.path.join(SCRIPT_DIR, "Chinook.sqlite")
 
 parser = argparse.ArgumentParser(description='Text2SQL 示例')

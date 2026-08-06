@@ -3,7 +3,13 @@
 
 import os
 import argparse
+from pathlib import Path
+
+from dotenv import load_dotenv
 from openai import OpenAI
+
+# 加载项目根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 parser = argparse.ArgumentParser(description='最简单的单次 LLM 调用示例')
 parser.add_argument('--model', type=str, default=os.getenv("MODEL", "qwen3-max"),

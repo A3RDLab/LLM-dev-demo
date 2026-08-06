@@ -20,7 +20,9 @@ MCP Client + Agent 示例（Streamable HTTP 传输）
 import os
 import asyncio
 import argparse
+from pathlib import Path
 
+from dotenv import load_dotenv
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from langchain_mcp_adapters.tools import load_mcp_tools
@@ -33,6 +35,9 @@ except ImportError:
     from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
+
+# 加载仓库根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # ===== 命令行参数（与仓库其他 demo 保持一致的风格） =====
 parser = argparse.ArgumentParser(description='MCP Client Agent 示例')

@@ -17,13 +17,18 @@ LangGraph 智能体示例（可运行版）
 
 import os
 import argparse
+from pathlib import Path
 from typing import Literal
 
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import create_react_agent, ToolNode, tools_condition
+
+# 加载仓库根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 # ===== 1. 命令行参数（与仓库其他 demo 保持一致的风格） =====
 parser = argparse.ArgumentParser(description='LangGraph Agent 示例')

@@ -1,5 +1,7 @@
 import os
 import logging
+from pathlib import Path
+
 from dotenv import load_dotenv
 from github import Github
 import operator
@@ -11,7 +13,8 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from typing import List
 
-load_dotenv()
+# 加载仓库根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
@@ -78,8 +81,13 @@ class AgentState(TypedDict):
     messages: Annotated[List[AnyMessage], operator.add]
 
 
-# Initialize LLM model
-model = ChatOpenAI(model="Qwen/Qwen3-235B-A22B", openai_api_base="https://api.siliconflow.cn/v1/", temperature=0).bind_tools(TOOLS)
+# Initialize LLM model（默认读仓库根目录 .env 的 MODEL / API_BASE / API_KEY）
+model = ChatOpenAI(
+    model=os.getenv("MODEL", "Qwen/Qwen3-235B-A22B"),
+    openai_api_key=os.getenv("API_KEY"),
+    openai_api_base=os.getenv("API_BASE", "https://api.siliconflow.cn/v1/"),
+    temperature=0,
+).bind_tools(TOOLS)
 
 def call_model(state: AgentState):
     messages = state['messages']

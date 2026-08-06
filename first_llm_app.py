@@ -1,15 +1,21 @@
 import os
 import argparse
+from pathlib import Path
+
+from dotenv import load_dotenv
 from openai import OpenAI
+
+# 加载项目根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # 设置命令行参数解析
 parser = argparse.ArgumentParser(description='AI对话脚本')
-parser.add_argument('--model', type=str, default='deepseek-ai/DeepSeek-R1',
-                    help='指定使用的模型名称（默认：deepseek-ai/DeepSeek-R1）')
+parser.add_argument('--model', type=str, default=os.getenv("MODEL", "deepseek-ai/DeepSeek-R1"),
+                    help='指定使用的模型名称（默认读取环境变量 MODEL）')
 parser.add_argument('--api_key', type=str, default=None,
-                    help='指定API密钥（默认使用环境变量API_KEY）')
-parser.add_argument('--base_url', type=str, default="https://api.siliconflow.cn/v1/",
-                    help='指定API基础URL（默认：https://api.siliconflow.cn/v1/）')
+                    help='指定API密钥（默认使用环境变量 API_KEY）')
+parser.add_argument('--base_url', type=str, default=os.getenv("API_BASE", "https://api.siliconflow.cn/v1/"),
+                    help='指定API基础URL（默认读取环境变量 API_BASE）')
 
 args = parser.parse_args()
 

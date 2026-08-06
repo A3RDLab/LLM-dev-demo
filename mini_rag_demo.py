@@ -21,12 +21,16 @@ import re
 import json
 import html
 import argparse
+from pathlib import Path
 
 import numpy as np
+from dotenv import load_dotenv
 from openai import OpenAI
 
 # ===== 配置 =====
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 加载项目根目录 .env（API_KEY / API_BASE / MODEL / EMBED_MODEL，见 .env.example）
+load_dotenv(Path(SCRIPT_DIR) / ".env")
 CORPUS_PATH = os.path.join(SCRIPT_DIR, "AliyunQA_RAG_demo", "scrapy-prj-aliyunecs", "qa.json")
 INDEX_PATH = os.path.join(SCRIPT_DIR, "rag_index.npz")
 META_PATH = os.path.join(SCRIPT_DIR, "rag_index_meta.json")
