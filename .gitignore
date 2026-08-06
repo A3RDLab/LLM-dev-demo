@@ -10,3 +10,10 @@ __pycache__/
 rag_index.npz
 rag_index_meta.json
 
+# demo 运行产生的临时产物（日志/临时文件/查询结果）
+agent_debug.log
+**/logs/
+_tmp_*.xlsx
+cleaned_tmp*.xlsx
+25f43b1486ad95a1/
+
