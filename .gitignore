@@ -17,3 +17,6 @@ _tmp_*.xlsx
 cleaned_tmp*.xlsx
 25f43b1486ad95a1/
 
+# Qoder IDE 本地资产（commands/skills 不入库；specs 等其他内容可正常跟踪）
+.qoder/commands/
+.qoder/skills/
