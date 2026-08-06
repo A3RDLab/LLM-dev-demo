@@ -104,16 +104,21 @@ prebuilt_agent = create_react_agent(
 )
 
 # ===== 5. 运行对比 =====
-if __name__ == "__main__":
-    print(f"问题: {args.query}\n")
+# 终端颜色：过程信息（问题/分节标题）灰色；pretty_print 为框架自带轨迹渲染，保留原样；
+# 最终回答用终端默认色
+GRAY = "\033[90m"
+RESET = "\033[0m"
 
-    print("=== 写法一：手搓 StateGraph ===")
+if __name__ == "__main__":
+    print(f"{GRAY}问题: {args.query}{RESET}\n")
+
+    print(f"{GRAY}=== 写法一：手搓 StateGraph ==={RESET}")
     result = graph.invoke({"messages": [HumanMessage(content=args.query)]})
     # 打印完整轨迹，观察 agent <-> tools 的循环过程
     for m in result["messages"]:
         m.pretty_print()
     print("最终回答:", result["messages"][-1].content)
 
-    print("\n=== 写法二：预构建 create_react_agent ===")
+    print(f"\n{GRAY}=== 写法二：预构建 create_react_agent ==={RESET}")
     result = prebuilt_agent.invoke({"messages": [HumanMessage(content=args.query)]})
     print("最终回答:", result["messages"][-1].content)

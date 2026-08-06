@@ -38,6 +38,10 @@ DEFAULT_MODEL = os.getenv("CHAT_MODEL", "deepseek-ai/DeepSeek-V3")
 MAX_TOOL_ROUNDS = 10       # 导航式需要多轮探索，轮数放宽一些
 ENTRY_PAGE = "index.md"    # LLM wiki 约定的入口目录页
 
+# 终端颜色：过程信息（工具调用轨迹）灰色，最终回答用终端默认色
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
 SYSTEM_PROMPT = f"""你是一个知识库导航助手，只能依据知识库中的内容回答问题。
 
 这个知识库是 LLM wiki 风格：入口是 {ENTRY_PAGE} 目录页，页面之间通过 Markdown 链接互相引用。
@@ -169,7 +173,7 @@ def stream_completion(client: OpenAI, model: str, messages: list) -> dict:
             continue
         if delta.content:  # 最终回答的文字片段：边收边打印
             if not answer_started:  # 首个片段到达才打标签，避免工具轮日志接在标签后
-                print("\n助手: ", end="", flush=True)
+                print(f"\n{GRAY}助手: {RESET}", end="", flush=True)
                 answer_started = True
             print(delta.content, end="", flush=True)
             content_parts.append(delta.content)
@@ -204,7 +208,7 @@ def run_agent(client: OpenAI, model: str, handlers: dict, messages: list[dict]) 
         for call in msg["tool_calls"]:
             fn = handlers.get(call["function"]["name"])
             args = json.loads(call["function"]["arguments"] or "{}")
-            print(f"  🔧 调用工具 {call['function']['name']}({args})")
+            print(f"{GRAY}  🔧 调用工具 {call['function']['name']}({args}){RESET}")
             result = fn(**args) if fn else f"未知工具：{call['function']['name']}"
             messages.append({
                 "role": "tool",
@@ -229,7 +233,7 @@ def main():
 
     kb_dir = Path(args.kb_dir)
     if not (kb_dir / ENTRY_PAGE).exists():
-        print(f"提示：知识库中没有 {ENTRY_PAGE}，模型将从 list_pages 开始探索")
+        print(f"{GRAY}提示：知识库中没有 {ENTRY_PAGE}，模型将从 list_pages 开始探索{RESET}")
 
     client = OpenAI(api_key=api_key, base_url=args.base_url)
     handlers = make_tool_handlers(kb_dir)

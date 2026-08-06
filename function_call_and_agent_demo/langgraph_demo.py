@@ -131,14 +131,18 @@ workflow.add_edge("tools", "agent")
 # Compile the workflow into a runnable application
 app = workflow.compile()
 
+# 终端颜色：过程信息（状态提示/步骤分隔）灰色；pretty_print 为框架自带轨迹渲染，保留原样
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
 # Generate and save the graph visualization
 try:
     image_data = app.get_graph().draw_mermaid_png()
     with open("agent_graph.png", "wb") as f:
         f.write(image_data)
-    print("Agent architecture saved as agent_graph.png")
+    print(f"{GRAY}Agent architecture saved as agent_graph.png{RESET}")
 except ImportError:
-    print("Please install pygraphviz to generate visualization: pip install pygraphviz")
+    print(f"{GRAY}Please install pygraphviz to generate visualization: pip install pygraphviz{RESET}")
 
 # Now we can invoke the agent
 inputs = {"messages": [HumanMessage(content="https://github.com/ai-shifu/ChatALL 是如何接入OpenAI的？")]}
@@ -147,7 +151,7 @@ inputs = {"messages": [HumanMessage(content="https://github.com/ai-shifu/ChatALL
 for step_output in app.stream(inputs, stream_mode="values"):
     for message in step_output['messages']:
         message.pretty_print()
-    print("\n---\n")
+    print(f"\n{GRAY}---{RESET}\n")
 
 # final_state = app.invoke(inputs)
 # final_answer = final_state['messages'][-1]

@@ -33,6 +33,10 @@ from langchain_openai import ChatOpenAI
 from deepagents import create_deep_agent
 from deepagents.backends.filesystem import FilesystemBackend
 
+# 终端颜色：过程信息（工具调用/结果/任务头）灰色，模型最终回复用终端默认色
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
 # 显式加载仓库根目录 .env（API_KEY / API_BASE / MODEL），避免依赖运行时的 cwd
 _HERE = Path(__file__).resolve().parent
 load_dotenv(_HERE.parent.parent / ".env")
@@ -135,13 +139,13 @@ def run(agent, task):
                         marker = "   <<< 第 2 层：加载完整 SKILL.md 指令"
                     elif tc["name"] == "read_file":
                         marker = "   <<< 第 3 层：按需读取 skill 附属资源"
-                    print(f"\n[{step:02d}] 🛠  调用工具 {tc['name']}({args_str}){marker}")
+                    print(f"\n{GRAY}[{step:02d}] 🛠  调用工具 {tc['name']}({args_str}){marker}{RESET}")
             elif msg.content:
-                print(f"\n🤖 模型回复：\n{msg.content}")
+                print(f"\n{GRAY}🤖 模型回复：{RESET}\n{msg.content}")
         elif mtype == "ToolMessage":
             content = str(msg.content)
-            print(f"     ↳ 结果({len(content)} 字符)：{content[:300]}"
-                  + (" …(截断)" if len(content) > 300 else ""))
+            print(f"{GRAY}     ↳ 结果({len(content)} 字符)：{content[:300]}"
+                  + (" …(截断)" if len(content) > 300 else "") + f"{RESET}")
 
 
 def main():
@@ -158,11 +162,11 @@ def main():
     if not args.api_key:
         sys.exit("缺少 API Key：设置环境变量 API_KEY，或通过 --api_key 传入")
 
-    print(f"任务：{args.task}\n{'=' * 60}")
+    print(f"{GRAY}任务：{args.task}\n{'=' * 60}{RESET}")
     agent = build_agent(args)
     run(agent, args.task)
-    print("\n" + "=" * 60)
-    print("产物检查：report.md / output/report.xlsx（位于本目录下）")
+    print(f"\n{GRAY}{'=' * 60}{RESET}")
+    print(f"{GRAY}产物检查：report.md / output/report.xlsx（位于本目录下）{RESET}")
 
 
 if __name__ == "__main__":

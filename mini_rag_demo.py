@@ -35,6 +35,10 @@ CORPUS_PATH = os.path.join(SCRIPT_DIR, "AliyunQA_RAG_demo", "scrapy-prj-aliyunec
 INDEX_PATH = os.path.join(SCRIPT_DIR, "rag_index.npz")
 META_PATH = os.path.join(SCRIPT_DIR, "rag_index_meta.json")
 
+# 终端颜色：过程信息（索引/检索/状态提示）灰色，最终回答用终端默认色
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
 EMBED_MODEL = os.getenv("EMBED_MODEL", "qwen3.7-text-embedding")
 CHUNK_SIZE = 800      # 每块目标字符数
 CHUNK_OVERLAP = 100   # 相邻块重叠字符数，避免语义被切断
@@ -102,7 +106,7 @@ def embed_texts(texts):
         batch = texts[i:i + EMBED_BATCH]
         resp = client.embeddings.create(model=EMBED_MODEL, input=batch, encoding_format="float")
         vecs.extend([d.embedding for d in resp.data])
-        print(f"  向量化进度: {min(i + EMBED_BATCH, len(texts))}/{len(texts)}")
+        print(f"{GRAY}  向量化进度: {min(i + EMBED_BATCH, len(texts))}/{len(texts)}{RESET}")
     return np.array(vecs, dtype=np.float32)
 
 
@@ -111,19 +115,19 @@ def build_index(force=False):
         data = np.load(INDEX_PATH)
         with open(META_PATH, encoding="utf-8") as f:
             meta = json.load(f)
-        print(f"[索引] 从缓存加载: {len(meta['chunks'])} 块, 维度 {data['vecs'].shape[1]}")
+        print(f"{GRAY}[索引] 从缓存加载: {len(meta['chunks'])} 块, 维度 {data['vecs'].shape[1]}{RESET}")
         return data["vecs"], meta["chunks"], meta["urls"]
 
-    print(f"[索引] 缓存不存在，开始构建（语料: {os.path.basename(CORPUS_PATH)}）...")
+    print(f"{GRAY}[索引] 缓存不存在，开始构建（语料: {os.path.basename(CORPUS_PATH)}）...{RESET}")
     chunks, urls = load_corpus()
-    print(f"[索引] 清洗切块完成: {len(chunks)} 块，开始向量化（模型 {EMBED_MODEL}）...")
+    print(f"{GRAY}[索引] 清洗切块完成: {len(chunks)} 块，开始向量化（模型 {EMBED_MODEL}）...{RESET}")
     vecs = embed_texts(chunks)
     # L2 归一化，之后余弦相似度可用点积直接算
     vecs = vecs / np.linalg.norm(vecs, axis=1, keepdims=True)
     np.savez_compressed(INDEX_PATH, vecs=vecs)
     with open(META_PATH, "w", encoding="utf-8") as f:
         json.dump({"chunks": chunks, "urls": urls, "embed_model": EMBED_MODEL}, f, ensure_ascii=False)
-    print(f"[索引] 构建完成并已缓存: {INDEX_PATH}")
+    print(f"{GRAY}[索引] 构建完成并已缓存: {INDEX_PATH}{RESET}")
     return vecs, chunks, urls
 
 
@@ -168,10 +172,10 @@ def generate(query: str, hits) -> str:
 
 def answer(query: str, vecs, chunks, urls, top_k: int):
     hits = retrieve(query, vecs, chunks, urls, top_k)
-    print("\n[检索结果]")
+    print(f"\n{GRAY}[检索结果]{RESET}")
     for i, (chunk, url, score) in enumerate(hits):
-        print(f"  #{i + 1} 相关度 {score:.3f} | {chunk[:60]}... | {url[:70]}")
-    print("\n[生成回答]")
+        print(f"{GRAY}  #{i + 1} 相关度 {score:.3f} | {chunk[:60]}... | {url[:70]}{RESET}")
+    print(f"\n{GRAY}[生成回答]{RESET}")
     ans = generate(query, hits)  # 回答已在 generate 内流式打印
     return ans
 
@@ -183,7 +187,7 @@ if __name__ == "__main__":
     if args.query:
         answer(args.query, vecs, chunks, urls, args.top_k)
     else:
-        print("\n进入交互模式（输入问题提问，直接回车退出）\n")
+        print(f"\n{GRAY}进入交互模式（输入问题提问，直接回车退出）{RESET}\n")
         while True:
             q = input("问题> ").strip()
             if not q:

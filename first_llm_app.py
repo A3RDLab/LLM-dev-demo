@@ -19,9 +19,8 @@ parser.add_argument('--base_url', type=str, default=os.getenv("API_BASE", "https
 
 args = parser.parse_args()
 
-# 终端颜色（ANSI 转义码）：思考过程灰色，正式回复青色，便于区分
+# 终端颜色（ANSI 转义码）：思考过程灰色，正式回复用终端默认色（不着色），便于区分
 GRAY = "\033[90m"
-CYAN = "\033[36m"
 RESET = "\033[0m"
 
 # 优先使用命令行提供的API_KEY，若没有则使用环境变量
@@ -89,15 +88,15 @@ while True:
                 if not is_answering:
                     # 如果有思考过程，添加额外换行
                     if has_reasoning:
-                        print(f"\n\n{CYAN}── {args.model} 回复: ──{RESET}")
+                        print(f"\n\n{GRAY}── {args.model} 回复: ──{RESET}")
                     else:
                         # 如果没有思考过程，直接显示回复提示
-                        print(f"\n{CYAN}── {args.model} 回复: ──{RESET}")
+                        print(f"\n{GRAY}── {args.model} 回复: ──{RESET}")
                     
                     is_answering = True
                 
-                # 输出回复内容
-                print(f"{CYAN}{delta.content}{RESET}", end='', flush=True)
+                # 输出回复内容（终端默认色，不着色）
+                print(delta.content, end='', flush=True)
                 answer_content += delta.content
     
     # 将完整回复添加到对话历史

@@ -12,15 +12,25 @@ from typing import Tuple, List, Dict, Any
 # 加载仓库根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s: %(message)s',
-    handlers=[
-        logging.FileHandler('agent_debug.log'),
-        logging.StreamHandler()
-    ]
-)
+# 终端颜色：控制台日志（过程信息）灰色，最终回答用终端默认色；
+# 文件日志保持无色，避免 ANSI 码污染 agent_debug.log
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
+class GrayFormatter(logging.Formatter):
+    """控制台专用 formatter：整行灰色（日志均为过程信息）"""
+    def format(self, record):
+        return f"{GRAY}{super().format(record)}{RESET}"
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+_LOG_FMT = '%(asctime)s %(levelname)s: %(message)s'
+_file_handler = logging.FileHandler('agent_debug.log')
+_file_handler.setFormatter(logging.Formatter(_LOG_FMT))      # 文件无色
+_console_handler = logging.StreamHandler()
+_console_handler.setFormatter(GrayFormatter(_LOG_FMT))        # 控制台灰色
+logger.addHandler(_file_handler)
+logger.addHandler(_console_handler)
 
 # Function definitions remain the same
 def _github_client() -> Github:
@@ -145,7 +155,7 @@ def call_with_messages(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
                 continue
             if delta.content:
                 if not answer_started:
-                    print("\nFinal Answer (streaming):", flush=True)
+                    print(f"\n{GRAY}Final Answer (streaming):{RESET}", flush=True)
                     answer_started = True
                 print(delta.content, end="", flush=True)
                 content_parts.append(delta.content)

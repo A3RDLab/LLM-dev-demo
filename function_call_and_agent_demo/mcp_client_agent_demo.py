@@ -63,9 +63,14 @@ model = ChatOpenAI(
     temperature=0.2,
 )
 
+# 终端颜色：过程信息（config/工具加载）灰色；pretty_print 为框架自带轨迹渲染，保留原样；
+# 最终回答用终端默认色
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
 # 启动诊断：打印实际生效的配置（Key 只显示长度和前缀，避免泄露）
-print(f"[config] model={args.model} | base_url={args.base_url} | "
-      f"api_key={'未设置!' if not api_key else f'{api_key[:8]}...(长度{len(api_key)})'}")
+print(f"{GRAY}[config] model={args.model} | base_url={args.base_url} | "
+      f"api_key={'未设置!' if not api_key else f'{api_key[:8]}...(长度{len(api_key)})'}{RESET}")
 
 
 async def main():
@@ -77,7 +82,7 @@ async def main():
 
             # 发现并加载远端工具为 LangChain tools
             tools = await load_mcp_tools(session)
-            print(f"已加载 {len(tools)} 个 MCP 工具: {[t.name for t in tools]}")
+            print(f"{GRAY}已加载 {len(tools)} 个 MCP 工具: {[t.name for t in tools]}{RESET}")
 
             # 交给 LangGraph 预构建 agent 完成推理与工具调用
             agent = create_react_agent(

@@ -31,6 +31,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(Path(SCRIPT_DIR) / ".env")
 DB_PATH = os.path.join(SCRIPT_DIR, "Chinook.sqlite")
 
+# 终端颜色：过程信息（轮次/SQL/查询结果）灰色，最终回答用终端默认色
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
 parser = argparse.ArgumentParser(description='Text2SQL 示例')
 parser.add_argument('--query', type=str,
                     default='哪个国家的客户总消费最高？金额是多少？顺便列出消费前3名的客户',
@@ -123,7 +127,7 @@ def stream_chat(messages):
             continue
         if delta.content:
             if not answer_started:  # 首个片段到达才打标签，避免工具轮日志接在标签后
-                print("[最终回答]")
+                print(f"{GRAY}[最终回答]{RESET}")
                 answer_started = True
             print(delta.content, end="", flush=True)
             content_parts.append(delta.content)
@@ -156,7 +160,7 @@ def run(query: str, schema: str, max_rounds: int = 5):
     ]
 
     for round_no in range(1, max_rounds + 1):
-        print(f"\n── 第 {round_no} 轮 ──")
+        print(f"\n{GRAY}── 第 {round_no} 轮 ──{RESET}")
         msg = stream_chat(messages)
 
         if not msg["tool_calls"]:
@@ -168,9 +172,9 @@ def run(query: str, schema: str, max_rounds: int = 5):
 
         for tc in msg["tool_calls"]:
             sql = json.loads(tc["function"]["arguments"])["sql"]
-            print(f"[执行 SQL] {sql}")
+            print(f"{GRAY}[执行 SQL] {sql}{RESET}")
             result = execute_sql(sql)
-            print(f"[查询结果] {result[:300]}{'...' if len(result) > 300 else ''}")
+            print(f"{GRAY}[查询结果] {result[:300]}{'...' if len(result) > 300 else ''}{RESET}")
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
 
     raise RuntimeError(f"超过 {max_rounds} 轮仍未得到最终回答")
@@ -178,7 +182,7 @@ def run(query: str, schema: str, max_rounds: int = 5):
 
 if __name__ == "__main__":
     schema = get_schema(args.db)
-    print("[Schema 内省结果]")
-    print(schema)
-    print(f"\n[用户问题] {args.query}")
+    print(f"{GRAY}[Schema 内省结果]{RESET}")
+    print(f"{GRAY}{schema}{RESET}")
+    print(f"\n{GRAY}[用户问题] {args.query}{RESET}")
     run(args.query, schema)

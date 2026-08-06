@@ -25,6 +25,10 @@ from pydantic import BaseModel, Field
 # 加载项目根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
+# 终端颜色：过程信息（分节标题、降级提示）灰色，结果（JSON/Pydantic 对象）用终端默认色
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
 # ===== 1. 用 Pydantic 定义期望的输出结构 =====
 class Contact(BaseModel):
     """从一段自然语言文本中抽取出的联系人信息"""
@@ -109,7 +113,7 @@ try:
 except BadRequestError as e:
     # 部分部署只支持 json_object：只保证输出是合法 JSON，不保证符合 Schema，
     # 结构正确性完全依赖后面的 Pydantic 校验兑底
-    print(f"[服务端不支持 json_schema，降级为 json_object 宽松模式]\n{str(e)[:120]}...\n")
+    print(f"{GRAY}[服务端不支持 json_schema，降级为 json_object 宽松模式]{RESET}\n{GRAY}{str(e)[:120]}...{RESET}\n")
     stream = client.chat.completions.create(
         model=args.model,
         messages=MESSAGES,
@@ -124,7 +128,7 @@ except BadRequestError as e:
 # ===== 5. 流式接收 JSON：边生成边打印，同时累积完整文本 =====
 # delta.content 里流出的就是 JSON 文本片段，与非流式调用相比只是把
 # “生成完一次性返回”变成“逐块返回”，最终内容完全一致
-print(f"=== 流式生成 JSON（{mode}） ===")
+print(f"{GRAY}=== 流式生成 JSON（{mode}） ==={RESET}")
 chunks = []
 for chunk in stream:
     delta = chunk.choices[0].delta.content if chunk.choices else None
@@ -139,7 +143,7 @@ raw = "".join(chunks)
 # 结构正确性仍以这里的完整校验为准
 result = ExtractionResult.model_validate_json(raw)
 
-print("=== Pydantic 对象（可直接用于后续业务逻辑） ===")
+print(f"{GRAY}=== Pydantic 对象（可直接用于后续业务逻辑） ==={RESET}")
 print(f"公司: {result.company}")
 print(f"摘要: {result.summary}")
 for c in result.contacts:
