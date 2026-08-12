@@ -2,6 +2,8 @@
 
 大模型应用开发的系列示例，覆盖从基础调用到 Agent 编排的完整学习路线。
 
+由 [A³ R&D Lab](https://github.com/A3RDLab)（读作 **A-cubed R&D Lab / A立方研发实验室**）维护。
+
 > 📖 **新手请从[实验手册.md](实验手册.md)开始**——一步步引导式实验，全部命令经过实机验证。
 
 ## 环境准备
@@ -69,3 +71,10 @@ export DASHSCOPE_API_KEY=<阿里云百炼 Key>
 - **切勿在代码中硬编码 API Key**，一律使用环境变量（见 `.env.example`）
 - 过时写法统一移入各目录的 `archive/`，其中的 README 说明了归档原因与替代方案
 - 人工智能生成内容仅供参考
+
+## 许可证与第三方材料
+
+- A³ R&D Lab 原创代码与文档采用 [Apache License 2.0](LICENSE)。
+- 第三方代码、模型文件、数据集、公开报告和示例语料不因收入本仓库而改变其原有权利状态，也不自动纳入 Apache-2.0。
+- 复用前请阅读 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 及相关子目录内的许可证或来源说明。
+- 仓库包含的 Anthropic `xlsx` Skill 受其目录内独立条款约束，不属于本仓库的 Apache-2.0 授权范围。
