@@ -41,6 +41,8 @@ python langgraph_agent_scaffold.py --query "深圳今天天气如何" --model qw
 | `tools_condition` / 自定义条件边 | 判断模型输出是继续调工具还是结束 |
 | `create_react_agent` | 预构建的完整 ReAct 图，等价于手搓版 |
 
+> **版本迁移提示**：LangChain 1.x / LangGraph 1.x 已把 `create_react_agent` 迁到 `langchain.agents.create_agent`，且提示词参数从 `prompt` 改名为 `system_prompt`（旧导入仍可用但会报弃用警告）。本示例脚本已做双向兼容：新版优先，老版回退。
+
 ## 进一步扩展
 
 - **人工审批**：在 `tools` 节点执行前加 `interrupt()`（LangGraph 1.x 的 human-in-the-loop 机制），对高危工具调用先等人确认

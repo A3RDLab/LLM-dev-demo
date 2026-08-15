@@ -28,11 +28,13 @@ from mcp.client.streamable_http import streamablehttp_client
 from langchain_mcp_adapters.tools import load_mcp_tools
 
 # LangGraph 1.x 把 create_react_agent 迁到了 langchain.agents.create_agent，
-# 这里做向后兼容：新版优先，老版回退
+# 且提示词参数从 prompt 改名为 system_prompt，这里做向后兼容：新版优先，老版回退
 try:
     from langchain.agents import create_agent as create_react_agent
+    _PROMPT_KWARG = "system_prompt"
 except ImportError:
     from langgraph.prebuilt import create_react_agent
+    _PROMPT_KWARG = "prompt"
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
@@ -88,7 +90,7 @@ async def main():
             agent = create_react_agent(
                 model,
                 tools,
-                prompt="你是一个助手，可以使用工具回答问题，请用中文回答。",
+                **{_PROMPT_KWARG: "你是一个助手，可以使用工具回答问题，请用中文回答。"},
             )
 
             result = await agent.ainvoke(

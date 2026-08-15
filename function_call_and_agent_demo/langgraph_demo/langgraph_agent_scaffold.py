@@ -25,7 +25,16 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langgraph.graph import StateGraph, START, END, MessagesState
-from langgraph.prebuilt import create_react_agent, ToolNode, tools_condition
+from langgraph.prebuilt import ToolNode, tools_condition
+
+# LangGraph 1.x 把 create_react_agent 迁到了 langchain.agents.create_agent，
+# 且提示词参数从 prompt 改名为 system_prompt，这里做向后兼容：新版优先，老版回退
+try:
+    from langchain.agents import create_agent as create_react_agent
+    _PROMPT_KWARG = "system_prompt"
+except ImportError:
+    from langgraph.prebuilt import create_react_agent
+    _PROMPT_KWARG = "prompt"
 
 # 加载仓库根目录 .env（API_KEY / API_BASE / MODEL，见 .env.example）
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
@@ -100,7 +109,7 @@ graph = workflow.compile()
 prebuilt_agent = create_react_agent(
     llm,
     tools,
-    prompt="你是一个助手，可以使用工具回答问题，请用中文回答。",
+    **{_PROMPT_KWARG: "你是一个助手，可以使用工具回答问题，请用中文回答。"},
 )
 
 # ===== 5. 运行对比 =====
