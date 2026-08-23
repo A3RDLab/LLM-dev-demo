@@ -1,5 +1,7 @@
 # Spec: cli-output-coloring
 
+## Purpose
+
 CLI demo 终端输出的统一着色规范：过程信息（思考/工具调用/中间步骤/日志）灰色，最终回答与结果使用终端默认色，并保证 messages 历史与返回值中不泄漏 ANSI 转义码。
 
 ## Requirements
