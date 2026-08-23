@@ -13,10 +13,10 @@ DeepAgents 把一个 Claude Code 式的 harness 打包成可嵌入的组件：
     第 2 层（指令）：agent 判断任务相关后，read_file 读取完整 SKILL.md
     第 3 层（资源）：按 SKILL.md 指引，需要时才读取 scripts/ references/ 等附属文件
 
-运行：
+运行（默认百炼 qwen3.8-max 多模态模型，从根目录 .env 读 DASHSCOPE_API_KEY / DASHSCOPE_BASE_URL）：
     python agent_harness_demo.py
-    python agent_harness_demo.py --task "分析销售数据的地区分布" --model qwen-max \
-        --base_url https://dashscope.aliyuncs.com/compatible-mode/v1 --api_key $DASHSCOPE_API_KEY
+    python agent_harness_demo.py --task "用 read_file 读取 data/ 下的年报图表，描述图表类型与关键数据"
+切换其他平台：--model/--base_url/--api_key 覆盖默认值（注意 read_file 读图需要多模态模型）。
 """
 import argparse
 import io
@@ -71,6 +71,8 @@ SYSTEM_PROMPT = """你是一个数据分析 agent，运行在 harness 提供的�
 - data/ 目录下是输入数据；分析结论写入 report.md，Excel 产物一律放入 output/ 目录。
 - 你配备了若干 Skill（见系统提示词中的 skill 清单）。当任务与某个 skill 的描述匹配时，
   必须先 read_file 读取该 skill 的完整 SKILL.md，再严格按其中的规范执行。
+- 你能直接看图：图片文件（.jpg/.png/.webp 等）用 read_file 读取后返回图像本身，
+  适用于图表识别、截图分析等任务；识别结果按任务要求整理成文字/JSON/mermaid。
 - 执行 Python 代码使用 execute_python 工具。环境中已预装 pandas 与 openpyxl。
 - skill 自带的脚本（如 skills/xlsx/scripts/recalc.py）是完整可执行的：
   在 execute_python 中用 subprocess 运行，注意脚本内部导入约定要求 cwd 切到
@@ -107,8 +109,12 @@ def execute_python(code: str) -> str:
 
 
 def build_agent(args):
+    # extra_body.enable_thinking=False：qwen3.5-3.8 系列默认开思考，关掉保证工具循环响应快、输出干净
+    # disable_streaming：流式下模型消息以 AIMessageChunk 分片到达，run() 的观察点打印依赖完整 AIMessage
+    # timeout：默认无超时，对端断连时请求会永久挂起（实测踩坑）
     llm = ChatOpenAI(model=args.model, api_key=args.api_key, base_url=args.base_url,
-                     temperature=0)
+                     temperature=0, extra_body={"enable_thinking": False},
+                     disable_streaming=True, timeout=300)
     # FilesystemBackend 以本 demo 目录为根：skills/ 与 data/ 都在 agent 的文件系统视野内
     backend = FilesystemBackend(root_dir=HERE)
     agent = create_deep_agent(
@@ -143,24 +149,30 @@ def run(agent, task):
             elif msg.content:
                 print(f"\n{GRAY}🤖 模型回复：{RESET}\n{msg.content}")
         elif mtype == "ToolMessage":
-            content = str(msg.content)
-            print(f"{GRAY}     ↳ 结果({len(content)} 字符)：{content[:300]}"
-                  + (" …(截断)" if len(content) > 300 else "") + f"{RESET}")
+            blocks = msg.content if isinstance(msg.content, list) else None
+            if blocks and any(b.get("type") == "image" for b in blocks if isinstance(b, dict)):
+                kinds = ", ".join(f"{b.get('type')}({b.get('mime_type', '?')})" for b in blocks if isinstance(b, dict))
+                print(f"\n{GRAY}     ↳ 返回多模态内容：{kinds}，图像直接进入模型上下文{RESET}")
+            else:
+                content = str(msg.content)
+                print(f"{GRAY}     ↳ 结果({len(content)} 字符)：{content[:300]}"
+                      + (" …(截断)" if len(content) > 300 else "") + f"{RESET}")
 
 
 def main():
     parser = argparse.ArgumentParser(description='Agent Harness 演示（DeepAgents + Skills）')
-    parser.add_argument('--model', type=str, default=os.getenv("MODEL", "Pro/deepseek-ai/DeepSeek-V3"),
-                        help='模型名（默认读环境变量 MODEL）')
+    parser.add_argument('--model', type=str, default="qwen3.8-max",
+                        help='模型名（默认 qwen3.8-max 多模态；read_file 读图任务需保持多模态模型）')
     parser.add_argument('--api_key', type=str, default=None,
-                        help='API Key（默认读环境变量 API_KEY）')
-    parser.add_argument('--base_url', type=str, default=os.getenv("API_BASE", "https://api.siliconflow.cn/v1/"),
-                        help='OpenAI 兼容端点（默认读环境变量 API_BASE）')
+                        help='API Key（默认依次读 DASHSCOPE_API_KEY / API_KEY）')
+    parser.add_argument('--base_url', type=str,
+                        default=os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+                        help='OpenAI 兼容端点（默认读 DASHSCOPE_BASE_URL，兜底百炼公共端点）')
     parser.add_argument('--task', type=str, default=DEFAULT_TASK, help='演示任务描述')
     args = parser.parse_args()
-    args.api_key = args.api_key or os.getenv("API_KEY")
+    args.api_key = args.api_key or os.getenv("DASHSCOPE_API_KEY") or os.getenv("API_KEY")
     if not args.api_key:
-        sys.exit("缺少 API Key：设置环境变量 API_KEY，或通过 --api_key 传入")
+        sys.exit("缺少 API Key：在根目录 .env 设置 DASHSCOPE_API_KEY（或 API_KEY），或通过 --api_key 传入")
 
     print(f"{GRAY}任务：{args.task}\n{'=' * 60}{RESET}")
     agent = build_agent(args)

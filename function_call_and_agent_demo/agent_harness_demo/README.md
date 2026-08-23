@@ -6,9 +6,11 @@
 
 本 demo 用 [LangChain DeepAgents](https://docs.langchain.com/oss/python/deepagents/overview) 演示一个 Claude Code 式 harness 的核心部件，并接入一个**现成的开源 Skill**（[anthropics/skills](https://github.com/anthropics/skills) 官方仓库的 `xlsx` skill），观察 **Skill 三层渐进式披露（progressive disclosure）** 的全过程。
 
+主模型默认百炼 `qwen3.8-max`（**多模态**）：deepagents 内置的 `read_file` 读图片时返回图像 block，agent 能直接"看图"（年报图表识别、截图分析等），无需任何额外工具——见下文"多模态读图"。
+
 与前置 demo 的递进关系：`demo-agent-with-tools-arg.py`（手写调用循环）→ `langgraph_demo/`（手搓图编排）→ **本 demo（框架化的完整 harness）**。
 
-📋 **分步实验指南见 [实验指南.md](实验指南.md)**：四个递进实验（端到端跑通 → Skill 路由负例 → 自定义数据源 → 与手写循环对照）+ 常见问题排查。
+📋 **分步实验指南见 [实验指南.md](实验指南.md)**：五个递进实验（端到端跑通 → Skill 路由负例 → 自定义数据源 → 与手写循环对照 → 多模态读图）+ 常见问题排查。
 
 ## 目录结构
 
@@ -20,7 +22,7 @@ agent_harness_demo/
 │   ├── SKILL.md            # Skill 指令主体（frontmatter + 正文）
 │   ├── LICENSE.txt
 │   └── scripts/            # Skill 自带脚本：recalc.py 公式重算、LibreOffice 助手、OOXML 校验器
-├── data/                   # 任务输入：销售记录 Excel（拷贝自仓库根目录）
+├── data/                   # 任务输入：销售记录 Excel + 年报图表 jpeg（读图实验素材）
 ├── output/                 # agent 生成的 Excel 产物（运行后出现）
 └── requirements.txt
 ```
@@ -85,18 +87,33 @@ async for message in query(prompt="分析 data/ 里的销售 Excel 并出报告"
 ```bash
 pip install -r requirements.txt
 
-# 配置 Key（复用仓库根目录 .env 的 API_KEY，或 export）
-export API_KEY=<硅基流动等 OpenAI 兼容平台的 Key>
-# Windows PowerShell：$env:API_KEY="<Key>"
+# 配置 Key（复用仓库根目录 .env 的 DASHSCOPE_API_KEY；可选 DASHSCOPE_BASE_URL 指定专属端点）
+# Windows PowerShell：$env:DASHSCOPE_API_KEY="<Key>"
 
-# 默认任务：按 xlsx skill 规范分析销售数据，产出 report.md + output/report.xlsx
+# 默认任务（qwen3.8-max @ 百炼）：按 xlsx skill 规范分析销售数据，产出 report.md + output/report.xlsx
 python agent_harness_demo.py
 
-# 自定义任务与模型
+# 多模态读图：read_file 读图片返回图像本身，模型直接看图
+python agent_harness_demo.py --task "用 read_file 读取 data/icbc_p013_infographic.jpeg，描述图表类型与关键数据"
+
+# 切换其他平台（注意：读图任务需多模态模型，纯文本模型不行）
 python agent_harness_demo.py --task "分析各地区的销售分布" \
-    --model qwen-max --base_url https://dashscope.aliyuncs.com/compatible-mode/v1 \
-    --api_key $DASHSCOPE_API_KEY
+    --model Pro/deepseek-ai/DeepSeek-V3 --base_url https://api.siliconflow.cn/v1/ \
+    --api_key $API_KEY
 ```
+
+## 多模态读图
+
+deepagents 的文件系统工具链已内置多模态管线：`read_file` 对 `.jpg/.png/.webp` 等图片按 base64 读取，以图像 content block 返回，多模态主模型（如 `qwen3.8-max`）能直接"看到"图。轨迹中的表现：
+
+```
+[01] 🛠  调用工具 read_file({'file_path': 'data/icbc_p033_pie_asset_structure.jpeg'})
+     ↳ 返回多模态内容：image(image/jpeg)，图像直接进入模型上下文
+```
+
+- 实测（2026-08）：`qwen3.8-max` 对年报信息图的数字识别、双环饼图→JSON 结构化均准确；
+- `extra_body={"enable_thinking": False}`：qwen3.5–3.8 系列默认开思考，已关闭以保证工具循环响应速度（其他平台若不识别该参数，换模型时注意）；
+- 成本提示：图像按约 32×32 像素/token 计费，大图/多图任务注意上下文与费用。
 
 ## 现成 Skill 出处与完整性说明
 
@@ -112,6 +129,8 @@ python agent_harness_demo.py --task "分析各地区的销售分布" \
 ## 注意事项
 
 - 本 demo 在 macOS 实测通过；Windows 已做代码适配（LibreOffice 路径自动探测、控制台 UTF-8 输出），操作步骤见 [实验指南.md](实验指南.md) 的"Windows 用户完整操作"小节（未实机验证）
+- 默认平台为百炼（`qwen3.8-max`），Key 需有该模型调用权限——企业专属实例"模型可见 ≠ 可调"，换 Key 先 `curl $API_BASE/models` + 实调验证（见根目录 AGENTS.md）
+- 读图依赖多模态主模型：`--model` 切到纯文本模型后，读图任务会失败或看不到图
 - 切勿在代码中硬编码 API Key
 - `execute_python` 工具会真实执行模型生成的代码且无隔离，仅用于本地学习演示，勿在生产环境照搬；生产沙箱可参考 `excel-process/` 的做法
 - 人工智能生成内容仅供参考

@@ -55,6 +55,8 @@ streamlit run function_call_and_agent_demo/excel-process/app.py
 
 **`finance_doc_review/` 是刻意为之的"现代范式"对照项目**：Pydantic v2 数据契约 + YAML 声明式规则引擎（`rules/credit_rules.yaml`）+ Pydantic AI 结构化抽取 + LangGraph 编排。分工原则是"规则引擎管确定性判断、LLM 只管语义抽取与发现"，critical 违规 fail-fast 短路跳过 LLM。它刻意避开本仓库旧代码的手写 messages 循环/JSON 字符串解析写法——扩展它时应延续这些范式。
 
+**`agent_harness_demo/` 默认平台为百炼 `qwen3.8-max`（多模态）**：默认读 `.env` 的 `DASHSCOPE_API_KEY`/`DASHSCOPE_BASE_URL`，`--model/--base_url/--api_key` 可覆盖切其他平台；`read_file` 读图依赖多模态主模型。`ChatOpenAI` 设了 `disable_streaming=True`（观察点打印依赖完整 AIMessage）与 `extra_body.enable_thinking=False`（qwen3.5–3.8 默认开思考）。
+
 **`agent_harness_demo/skills/xlsx/` 来自 anthropics/skills 官方仓库，完整未裁剪**：不要精简或改动它；`scripts/recalc.py` 的公式重算依赖 LibreOffice（`soffice` 在 PATH），脚本内部 `from office.soffice import ...` 要求以 `skills/xlsx/scripts/` 为工作目录调用。`execute_python` 工具无隔离地真实执行模型生成的代码，仅用于本地教学。
 
 **`wiki_kb_agent_demo/` 的零 embedding 是设计决策而非遗漏**：wiki 式知识库（`index.md` 入口 + 链接互引）优先用导航式检索（`read_page`/`list_pages`/`grep_kb` 工具循环），不做切块向量化；仅当规模极大时才补 `search_wiki` 工具。入口页名由 `kb_agent.py` 的 `ENTRY_PAGE` 常量控制。
