@@ -1,9 +1,12 @@
 # Agent Harness 演示（DeepAgents + Agent Skills）
 # 独立依赖，不与根目录 requirements.txt 混装
 
-deepagents>=0.7
+# 锁 <0.8：skill_installer.py 使用了 0.7.x 的私有扫描函数 _list_skills_with_errors，
+# 升级大版本前需同步适配（同类先例：根目录 mcp[cli]<2）
+deepagents>=0.7,<0.8
 langchain-openai>=0.3
 python-dotenv>=1.0
+pyyaml>=6
 
 # execute_python 工具运行环境所需（agent 分析 Excel 时使用）
 pandas>=2.0

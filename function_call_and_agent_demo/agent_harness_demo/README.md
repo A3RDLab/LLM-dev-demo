@@ -10,18 +10,20 @@
 
 与前置 demo 的递进关系：`demo-agent-with-tools-arg.py`（手写调用循环）→ `langgraph_demo/`（手搓图编排）→ **本 demo（框架化的完整 harness）**。
 
-📋 **分步实验指南见 [实验指南.md](实验指南.md)**：五个递进实验（端到端跑通 → Skill 路由负例 → 自定义数据源 → 与手写循环对照 → 多模态读图）+ 常见问题排查。
+📋 **分步实验指南见 [实验指南.md](实验指南.md)**：六个递进实验（端到端跑通 → Skill 路由负例 → 自定义数据源 → 与手写循环对照 → 多模态读图 → 运行时安装 skill）+ 常见问题排查。
 
 ## 目录结构
 
 ```
 agent_harness_demo/
 ├── agent_harness_demo.py   # 主脚本
+├── skill_installer.py      # install_skill 工具 + skill 清单热刷新 middleware
 ├── 实验指南.md             # 分步实验手册（建议按此顺序上手）
 ├── skills/xlsx/            # 现成 Skill（来自 anthropics/skills，完整未裁剪，见下方说明）
 │   ├── SKILL.md            # Skill 指令主体（frontmatter + 正文）
 │   ├── LICENSE.txt
 │   └── scripts/            # Skill 自带脚本：recalc.py 公式重算、LibreOffice 助手、OOXML 校验器
+├── skill_submissions/      # 用户提交的 skill 包（zip/目录），agent 用 install_skill 安装
 ├── data/                   # 任务输入：销售记录 Excel + 年报图表 jpeg（读图实验素材）
 ├── output/                 # agent 生成的 Excel 产物（运行后出现）
 └── requirements.txt
@@ -114,6 +116,29 @@ deepagents 的文件系统工具链已内置多模态管线：`read_file` 对 `.
 - 实测（2026-08）：`qwen3.8-max` 对年报信息图的数字识别、双环饼图→JSON 结构化均准确；
 - `extra_body={"enable_thinking": False}`：qwen3.5–3.8 系列默认开思考，已关闭以保证工具循环响应速度（其他平台若不识别该参数，换模型时注意）；
 - 成本提示：图像按约 32×32 像素/token 计费，大图/多图任务注意上下文与费用。
+
+## 提交你自己的 skill（运行时安装）
+
+deepagents 官方的 `SkillsMiddleware` 只在会话启动时扫描一次 `skills/`，本 demo 用 `skill_installer.py` 里的 `RefreshableSkillsMiddleware` 补上了"运行时安装"：agent 拿到一个 `install_skill` 工具，装完立即热刷新 skill 清单，**无需重启会话**（原理：清单是每次模型调用从 state 重新渲染的，装完更新 state 即生效）。
+
+```bash
+# 1. 把 skill 包放进 skill_submissions/（zip 或目录均可，zip 内允许 .qoder/skills/<name>/ 等嵌套布局）
+cp my-skill.zip skill_submissions/
+
+# 2. 任务里一句话让 agent 自己装
+python agent_harness_demo.py --task "用 install_skill 安装 skill_submissions/my-skill.zip，然后按它的规范处理 ..."
+```
+
+`install_skill` 的校验（`skill_installer.py`）：zip-slip 防护（拒绝绝对路径/`..`/符号链接条目）；`SKILL.md` frontmatter 必须有 `name`（小写字母/数字/单连字符、≤64 字符、与目录名一致）和 `description`（≤1024 字符）；同名 skill 已存在时拒绝。所有错误信息面向提交者可读——对比 deepagents 原生行为：frontmatter 缺字段是**静默跳过**的，装完不报错但清单里没有，这正是安装器要显式报错的原因。
+
+约定与边界：
+
+- **卸载 = 删除目录**：`rm -rf skills/<name>/`（运行时安装的 skill 不进 git，`.gitignore` 只保留官方 `skills/xlsx/`）；
+- `skill_installer.py` 使用了 deepagents 0.7.x 的私有扫描函数 `_list_skills_with_errors`，`requirements.txt` 已锁 `deepagents>=0.7,<0.8`（同类先例：根目录 `mcp[cli]<2`）；
+- 热刷新只作用于主 agent 循环；启用 checkpointer 的生产用法需自行处理重扫语义；
+- `install_skill` 与 `execute_python` 同属本地教学的信任模型（解压落盘 + 执行 skill 脚本都是真实副作用），勿在生产照搬。
+
+示例包：`skill_submissions/annual-report-to-kb.zip`（年报 PDF → 层级化 Markdown 知识库，含目录解析/页码校验/表格重建/图表识别），配合多模态读图能力可端到端跑通"装 skill → 切年报 → 看图识别"，见实验指南实验 6。
 
 ## 现成 Skill 出处与完整性说明
 

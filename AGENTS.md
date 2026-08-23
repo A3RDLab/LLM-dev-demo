@@ -57,6 +57,8 @@ streamlit run function_call_and_agent_demo/excel-process/app.py
 
 **`agent_harness_demo/` 默认平台为百炼 `qwen3.8-max`（多模态）**：默认读 `.env` 的 `DASHSCOPE_API_KEY`/`DASHSCOPE_BASE_URL`，`--model/--base_url/--api_key` 可覆盖切其他平台；`read_file` 读图依赖多模态主模型。`ChatOpenAI` 设了 `disable_streaming=True`（观察点打印依赖完整 AIMessage）与 `extra_body.enable_thinking=False`（qwen3.5–3.8 默认开思考）。
 
+**`agent_harness_demo/` 的运行时 skill 安装**：`skill_installer.py` 的 `RefreshableSkillsMiddleware` 同名替换官方 SkillsMiddleware，提供 `install_skill` 工具（zip-slip 防护 + Agent Skills 规范校验 + `Command` 热刷新 state），用户提交的包放 `skill_submissions/`（示例 `annual-report-to-kb.zip` 入库）；运行时安装的 skill 不入库（`.gitignore` 只保留 `skills/xlsx/`，卸载=删目录）。它 import 了 deepagents 0.7.x 私有函数 `_list_skills_with_errors`，故依赖锁 `deepagents>=0.7,<0.8`，升级前需同步适配。
+
 **`agent_harness_demo/skills/xlsx/` 来自 anthropics/skills 官方仓库，完整未裁剪**：不要精简或改动它；`scripts/recalc.py` 的公式重算依赖 LibreOffice（`soffice` 在 PATH），脚本内部 `from office.soffice import ...` 要求以 `skills/xlsx/scripts/` 为工作目录调用。`execute_python` 工具无隔离地真实执行模型生成的代码，仅用于本地教学。
 
 **`wiki_kb_agent_demo/` 的零 embedding 是设计决策而非遗漏**：wiki 式知识库（`index.md` 入口 + 链接互引）优先用导航式检索（`read_page`/`list_pages`/`grep_kb` 工具循环），不做切块向量化；仅当规模极大时才补 `search_wiki` 工具。入口页名由 `kb_agent.py` 的 `ENTRY_PAGE` 常量控制。

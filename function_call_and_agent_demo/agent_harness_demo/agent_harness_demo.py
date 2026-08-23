@@ -33,6 +33,8 @@ from langchain_openai import ChatOpenAI
 from deepagents import create_deep_agent
 from deepagents.backends.filesystem import FilesystemBackend
 
+from skill_installer import RefreshableSkillsMiddleware
+
 # 终端颜色：过程信息（工具调用/结果/任务头）灰色，模型最终回复用终端默认色
 GRAY = "\033[90m"
 RESET = "\033[0m"
@@ -74,6 +76,9 @@ SYSTEM_PROMPT = """你是一个数据分析 agent，运行在 harness 提供的�
 - 你能直接看图：图片文件（.jpg/.png/.webp 等）用 read_file 读取后返回图像本身，
   适用于图表识别、截图分析等任务；识别结果按任务要求整理成文字/JSON/mermaid。
 - 执行 Python 代码使用 execute_python 工具。环境中已预装 pandas 与 openpyxl。
+- 用户可能在任务里让你安装新 skill：用 install_skill 工具（source_path 是工作目录内的相对路径，
+  约定放在 skill_submissions/ 下，zip 包或目录均可）。安装成功后 skill 清单立即刷新——
+  先 read_file 它的 skills/<name>/SKILL.md，再严格按其中的规范执行。
 - skill 自带的脚本（如 skills/xlsx/scripts/recalc.py）是完整可执行的：
   在 execute_python 中用 subprocess 运行，注意脚本内部导入约定要求 cwd 切到
   skills/xlsx/scripts/（如 subprocess.run(['python3', 'recalc.py', <文件绝对路径>], cwd='skills/xlsx/scripts')；
@@ -117,12 +122,16 @@ def build_agent(args):
                      disable_streaming=True, timeout=300)
     # FilesystemBackend 以本 demo 目录为根：skills/ 与 data/ 都在 agent 的文件系统视野内
     backend = FilesystemBackend(root_dir=HERE)
+    # RefreshableSkillsMiddleware 同名替换官方 SkillsMiddleware：额外提供 install_skill
+    # 工具，装完热刷新 skill 清单（见 skill_installer.py）；sources 与 skills 参数一致
     agent = create_deep_agent(
         model=llm,
         tools=[execute_python],
         system_prompt=SYSTEM_PROMPT,
         skills=["skills/"],      # 第 1 层：启动时只把 SKILL.md frontmatter 注入提示词
         backend=backend,
+        middleware=[RefreshableSkillsMiddleware(backend=backend, sources=["skills/"],
+                                                skills_root=HERE / "skills", install_root=HERE)],
     )
     return agent
 

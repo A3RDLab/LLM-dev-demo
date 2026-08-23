@@ -1,3 +1,8 @@
 # 运行时产物（agent 生成的报告与 Excel）
 output/
 report.md
+knowledge_base/
+
+# 运行时经 install_skill 安装的 skill 不入库（xlsx 为官方预置，保留）
+skills/*
+!skills/xlsx/
