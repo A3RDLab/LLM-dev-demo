@@ -52,6 +52,11 @@ export DASHSCOPE_API_KEY=<阿里云百炼 Key>
 |---|---|
 | `text2sql_demo.py` | schema 自动内省 + function calling 执行 SQL + 错误自修复（Chinook 示例库） |
 
+### 本体与知识图谱
+| Demo | 说明 |
+|---|---|
+| [`ontology_demo/`](ontology_demo/) | 默认离线对照 OWL 推理前后的资源台账。配置模型后，`--query` 将自然语言问题转为 SPARQL，并根据查询结果作答（依赖独立安装）。 |
+
 ### 生产风格完整项目
 | Demo | 说明 |
 |---|---|
@@ -62,7 +67,7 @@ export DASHSCOPE_API_KEY=<阿里云百炼 Key>
 1. **基础**：`first_llm_call.py` → `first_llm_app.py` → `structured_output_demo.py`
 2. **Agent**：`demo-agent-with-tools-arg.py` → `langgraph_demo` → `agent_harness_demo`（Agent Harness + Skills）→ MCP demo
 3. **RAG**：`mini_rag_demo.py`（无依赖全链路）→ `wiki_kb_agent_demo`（导航式知识库）
-4. **数据**：`text2sql_demo.py` → `excel-process`
+4. **数据** `text2sql_demo.py` → 可选做 `ontology_demo/` → `excel-process`
 5. **综合**：`finance_doc_review/`
 
 ## 注意事项

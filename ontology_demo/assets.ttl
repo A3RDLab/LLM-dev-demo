@@ -1,0 +1,29 @@
+@prefix ex: <https://example.org/llm-dev-demo/ontology#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# 虚构的资源台账。这里只有明确记录的事实。
+ex:checkout a ex:Service ;
+    rdfs:label "结算服务"@zh ;
+    ex:dependsOn ex:batchNode, ex:checkoutVm, ex:checkoutWorkload, ex:checkoutDb .
+
+ex:batchNode a ex:ComputeResource ;
+    rdfs:label "批处理节点"@zh ;
+    ex:managedBy ex:platformTeam .
+
+ex:checkoutVm a ex:VirtualMachine ;
+    rdfs:label "结算虚拟机"@zh ;
+    ex:managedBy ex:platformTeam .
+
+ex:checkoutWorkload a ex:ContainerWorkload ;
+    rdfs:label "结算容器工作负载"@zh .
+
+ex:checkoutDb a ex:Database ;
+    rdfs:label "结算数据库"@zh ;
+    ex:managedBy ex:platformTeam .
+
+ex:platformTeam a ex:Team ;
+    rdfs:label "平台组"@zh .
+
+ex:applicationTeam a ex:Team ;
+    rdfs:label "应用组"@zh ;
+    ex:manages ex:checkoutWorkload .

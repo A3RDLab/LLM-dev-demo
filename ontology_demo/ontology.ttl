@@ -1,0 +1,32 @@
+@prefix ex: <https://example.org/llm-dev-demo/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# 类与分类规则
+ex:Service a owl:Class .
+ex:Resource a owl:Class .
+ex:Team a owl:Class .
+
+ex:ComputeResource a owl:Class ;
+    rdfs:subClassOf ex:Resource .
+
+ex:VirtualMachine a owl:Class ;
+    rdfs:subClassOf ex:ComputeResource .
+
+ex:ContainerWorkload a owl:Class ;
+    rdfs:subClassOf ex:ComputeResource .
+
+ex:Database a owl:Class ;
+    rdfs:subClassOf ex:Resource .
+
+# 对象属性连接两个实例，声明关系的方向和语义。
+ex:dependsOn a owl:ObjectProperty ;
+    rdfs:domain ex:Service ;
+    rdfs:range ex:Resource .
+
+ex:manages a owl:ObjectProperty ;
+    rdfs:domain ex:Team ;
+    rdfs:range ex:Resource ;
+    owl:inverseOf ex:managedBy .
+
+ex:managedBy a owl:ObjectProperty .

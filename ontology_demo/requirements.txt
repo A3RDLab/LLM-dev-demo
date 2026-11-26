@@ -1,0 +1,4 @@
+rdflib>=7.1.4
+owlrl>=7.1.4
+openai>=1.60
+python-dotenv>=1.0
