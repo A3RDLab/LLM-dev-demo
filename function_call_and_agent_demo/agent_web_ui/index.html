@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>实验 4 · Agent 执行观察台</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #667085;
+      --line: #e4e7ec;
+      --surface: #ffffff;
+      --canvas: #f5f7fb;
+      --primary: #3157d5;
+      --primary-dark: #2444ae;
+      --model: #7157c8;
+      --tool: #b42318;
+      --success: #067647;
+      --warning: #b54708;
+      --danger: #b42318;
+      --shadow: 0 12px 32px rgba(16, 24, 40, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.6;
+    }
+
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+    .hero {
+      color: #fff;
+      background: linear-gradient(125deg, #172033 0%, #233d74 62%, #3157d5 100%);
+      padding: 38px 32px 42px;
+    }
+
+    .hero-inner, .layout {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #c7d4ff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); line-height: 1.25; }
+    .hero p:last-child { max-width: 780px; margin: 12px 0 0; color: #e1e7f5; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 370px minmax(0, 1fr);
+      gap: 24px;
+      padding: 24px 28px 48px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .config-panel { padding: 22px; position: sticky; top: 20px; }
+    .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    h2 { margin: 0; font-size: 18px; line-height: 1.4; }
+    h3 { margin: 0; font-size: 15px; }
+
+    fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+    fieldset:disabled { opacity: 0.72; }
+    .field { margin-bottom: 15px; }
+    .field-row { display: grid; grid-template-columns: 1fr 112px; gap: 12px; }
+
+    label { display: block; margin-bottom: 5px; font-size: 13px; font-weight: 650; }
+    .optional { color: var(--muted); font-weight: 400; }
+
+    input, textarea {
+      display: block;
+      width: 100%;
+      border: 1px solid #cfd5df;
+      border-radius: 9px;
+      background: #fff;
+      color: var(--ink);
+      padding: 9px 11px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(49, 87, 213, 0.12); }
+    input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--danger); }
+    textarea { min-height: 116px; resize: vertical; }
+    .hint { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+
+    .notice {
+      margin: 18px 0;
+      padding: 12px 13px;
+      border-radius: 10px;
+      background: #f2f4f7;
+      color: #475467;
+      font-size: 12px;
+    }
+    .notice strong { color: var(--ink); }
+
+    .actions { display: grid; grid-template-columns: 1fr auto auto; gap: 9px; }
+    .btn {
+      min-height: 42px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      padding: 8px 15px;
+      font-weight: 650;
+      transition: background 0.15s;
+    }
+    .btn-primary { color: #fff; background: var(--primary); }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+    .btn-secondary { color: #344054; background: #fff; border-color: #cfd5df; }
+    .btn-secondary:hover:not(:disabled) { background: #f2f4f7; }
+    .btn-stop { color: var(--danger); background: #fff; border-color: #f0b8b2; }
+
+    .workspace { min-width: 0; display: grid; gap: 18px; }
+    .status-panel { padding: 17px 20px; display: flex; align-items: center; gap: 13px; }
+    .status-dot { width: 11px; height: 11px; flex: 0 0 auto; border-radius: 50%; background: #98a2b3; }
+    .status-dot.running { background: var(--primary); box-shadow: 0 0 0 5px rgba(49, 87, 213, 0.12); animation: pulse 1.4s infinite; }
+    .status-dot.success { background: var(--success); }
+    .status-dot.error { background: var(--danger); }
+    .status-dot.stopped { background: var(--warning); }
+    @keyframes pulse { 50% { opacity: 0.45; } }
+    .status-copy { min-width: 0; }
+    .status-title { font-weight: 700; }
+    .status-detail { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+    .answer-panel, .timeline-panel { padding: 22px; }
+    .answer-panel { border-top: 4px solid var(--primary); }
+    .answer-output {
+      margin: 12px 0 0;
+      min-height: 72px;
+      max-height: 560px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: 14px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+    }
+    .placeholder { color: #98a2b3; }
+
+    .timeline { position: relative; display: grid; gap: 14px; margin-top: 16px; }
+    .empty-state { padding: 34px 16px; border: 1px dashed #cfd5df; border-radius: 12px; color: var(--muted); text-align: center; }
+    .card { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+    .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 13px 15px; background: #f8fafc; }
+    .card-title { min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+    .card-subtitle { margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 400; }
+    .card-body { padding: 14px 15px; }
+    .card.user { border-left: 4px solid var(--primary); }
+    .round { overflow: hidden; border: 1px solid #dfe3eb; border-radius: 14px; }
+    .round-heading { padding: 10px 15px; background: #eaedf5; color: #475467; font-size: 13px; font-weight: 750; }
+    .round-content { display: grid; gap: 0; }
+    .round .card { border: 0; border-radius: 0; border-top: 1px solid var(--line); }
+    .round .card:first-child { border-top: 0; }
+    .card.model { border-left: 4px solid var(--model); }
+    .card.tool { border-left: 4px solid #e36c35; }
+    .card.error { border-left: 4px solid var(--danger); background: #fffafa; }
+
+    .badge { flex: 0 0 auto; display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px; background: #eef1f6; color: #475467; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .badge.running { background: #eaf0ff; color: var(--primary-dark); }
+    .badge.success { background: #e8f6ef; color: var(--success); }
+    .badge.error { background: #fff0ee; color: var(--danger); }
+    .badge.stopped { background: #fff4e5; color: var(--warning); }
+
+    pre.code {
+      margin: 0;
+      max-height: 380px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: #263248;
+      font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      tab-size: 2;
+    }
+    .model-content:empty::before { content: "等待模型正文…"; color: #98a2b3; }
+    .tool-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
+    details { margin-top: 12px; border: 1px solid #e7eaf0; border-radius: 8px; background: #fbfcfe; }
+    summary { padding: 8px 11px; cursor: pointer; color: #475467; font-size: 12px; font-weight: 650; }
+    details > .details-body { padding: 12px; border-top: 1px solid #e7eaf0; }
+    .error-text { margin: 0; color: var(--danger); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+    .flow-note { margin: 14px 0 0; color: var(--muted); font-size: 12px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 920px) {
+      .layout { grid-template-columns: 1fr; padding: 18px; }
+      .config-panel { position: static; }
+      .hero { padding: 30px 22px; }
+    }
+
+    @media (max-width: 520px) {
+      .layout { padding: 12px; }
+      .config-panel, .answer-panel, .timeline-panel { padding: 16px; }
+      .field-row { grid-template-columns: 1fr; }
+      .actions { grid-template-columns: 1fr 1fr; }
+      .btn-primary { grid-column: 1 / -1; }
+      .card-header { flex-direction: column; gap: 7px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .status-dot.running { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">LLM 教学实验 · Function Calling</p>
+      <h1>Agent 执行观察台</h1>
+      <p>把“模型请求工具 → 浏览器执行 → 结果回填 → 再次请求模型”的每一步放在时间线上。页面在本地运行，不需要服务端。</p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel config-panel" aria-labelledby="config-title">
+      <div class="panel-heading">
+        <h2 id="config-title">运行配置</h2>
+        <span class="badge">实验 4 Web 版</span>
+      </div>
+      <form id="agent-form" novalidate autocomplete="off">
+        <fieldset id="config-fields">
+          <div class="field">
+            <label for="api-base">API Base</label>
+            <input id="api-base" name="api-base" type="url" value="https://api.siliconflow.cn/v1/" required spellcheck="false">
+            <p class="hint">OpenAI 兼容端点，页面会自动追加 /chat/completions</p>
+          </div>
+          <div class="field">
+            <label for="api-key">API Key</label>
+            <input id="api-key" name="api-key" type="password" required autocomplete="off" spellcheck="false" placeholder="仅在当前页面内存中使用">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="model">Model</label>
+              <input id="model" name="model" type="text" value="Pro/deepseek-ai/DeepSeek-V3" required spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="max-iterations">最大轮次</label>
+              <input id="max-iterations" name="max-iterations" type="number" value="10" min="1" max="100" required>
+            </div>
+          </div>
+          <div class="field">
+            <label for="github-token">GitHub Token <span class="optional">（可选）</span></label>
+            <input id="github-token" name="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="匿名访问公开仓库时留空">
+          </div>
+          <div class="field">
+            <label for="query">用户问题</label>
+            <textarea id="query" name="query" required>https://github.com/ai-shifu/ChatALL 是如何接入OpenAI的？</textarea>
+          </div>
+        </fieldset>
+        <div class="notice">
+          <strong>密钥不会持久化。</strong>API Key 与 Token 只放入对应请求的 Authorization 头，不写入浏览器存储。请仅连接你信任的端点。浏览器直连还要求端点允许跨域访问。
+        </div>
+        <div class="actions">
+          <button id="start-button" class="btn btn-primary" type="submit">开始执行</button>
+          <button id="stop-button" class="btn btn-stop" type="button" disabled>停止</button>
+          <button id="clear-button" class="btn btn-secondary" type="button">清空</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="workspace">
+      <section class="panel status-panel" aria-live="polite" aria-atomic="true">
+        <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+        <div class="status-copy">
+          <div id="status-title" class="status-title">就绪</div>
+          <div id="status-detail" class="status-detail">填写 API Key 后开始；执行轨迹会按轮次出现在下方。</div>
+        </div>
+      </section>
+
+      <section class="panel answer-panel" aria-labelledby="answer-title">
+        <div class="panel-heading">
+          <h2 id="answer-title">最终回答</h2>
+          <span id="answer-badge" class="badge">等待运行</span>
+        </div>
+        <pre id="answer-output" class="answer-output placeholder">模型不再请求工具时，最终回答会显示在这里。</pre>
+      </section>
+
+      <section class="panel timeline-panel" aria-labelledby="timeline-title">
+        <div class="panel-heading">
+          <h2 id="timeline-title">执行时间线</h2>
+          <span class="badge">完整参数与结果可展开</span>
+        </div>
+        <div id="timeline" class="timeline">
+          <div id="empty-state" class="empty-state">尚未运行。建议观察第 1 轮目录侦察、中间轮文件读取，以及最后一轮最终回答。</div>
+        </div>
+        <p class="flow-note">消息回填关系：assistant(tool_calls) → tool(tool_call_id) → 下一轮模型请求。每轮模型卡片中可展开查看实际发送的 messages。</p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    "use strict";
+
+    // 与 demo-agent-with-tools-arg.py 对齐的教学协议。
+    const SYSTEM_PROMPT = "You are a helpful assistant for software development tasks.";
+    const TOOLS = [
+      {
+        type: "function",
+        function: {
+          name: "get_repo_tree",
+          description: "Get the directory structure of a repository",
+          parameters: {
+            type: "object",
+            properties: {
+              repo_full_name: { type: "string", description: "The full name of the repository, e.g. openai/gpt-3" },
+              branch: { type: "string", description: "The branch name, e.g. master (defaults to 'main' if not provided)" }
+            },
+            required: ["repo_full_name"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_repo_file_content",
+          description: "Get the content of a file in a repository",
+          parameters: {
+            type: "object",
+            properties: {
+              repo_full_name: { type: "string", description: "The full name of the repository, e.g. openai/gpt-3" },
+              file_path: { type: "string", description: "The path to the file in the repository" },
+              branch: { type: "string", description: "The branch name, e.g. master (defaults to 'main' if not provided)" }
+            },
+            required: ["repo_full_name", "file_path"]
+          }
+        }
+      }
+    ];
+
+    const ui = {
+      form: document.getElementById("agent-form"),
+      fields: document.getElementById("config-fields"),
+      apiBase: document.getElementById("api-base"),
+      apiKey: document.getElementById("api-key"),
+      model: document.getElementById("model"),
+      maxIterations: document.getElementById("max-iterations"),
+      githubToken: document.getElementById("github-token"),
+      query: document.getElementById("query"),
+      startButton: document.getElementById("start-button"),
+      stopButton: document.getElementById("stop-button"),
+      clearButton: document.getElementById("clear-button"),
+      statusDot: document.getElementById("status-dot"),
+      statusTitle: document.getElementById("status-title"),
+      statusDetail: document.getElementById("status-detail"),
+      answerBadge: document.getElementById("answer-badge"),
+      answerOutput: document.getElementById("answer-output"),
+      timeline: document.getElementById("timeline")
+    };
+
+    const runtime = {
+      running: false,
+      stopRequested: false,
+      runId: 0,
+      controller: null,
+      config: null,
+      activeModel: null,
+      activeTools: new Map()
+    };
+
+    class HttpError extends Error {
+      constructor(status, message) {
+        super(message);
+        this.name = "HttpError";
+        this.status = status;
+      }
+    }
+
+    function setStatus(kind, title, detail = "") {
+      ui.statusDot.className = `status-dot${kind ? ` ${kind}` : ""}`;
+      ui.statusTitle.textContent = title;
+      ui.statusDetail.textContent = detail;
+    }
+
+    function setRunning(running) {
+      runtime.running = running;
+      ui.fields.disabled = running;
+      ui.startButton.disabled = running;
+      ui.stopButton.disabled = !running;
+      ui.clearButton.disabled = running;
+    }
+
+    function clearValidation() {
+      for (const field of [ui.apiBase, ui.apiKey, ui.model, ui.maxIterations, ui.query]) {
+        field.removeAttribute("aria-invalid");
+      }
+    }
+
+    function readConfig() {
+      clearValidation();
+      const config = {
+        apiBase: ui.apiBase.value.trim(),
+        apiKey: ui.apiKey.value.trim(),
+        model: ui.model.value.trim(),
+        githubToken: ui.githubToken.value.trim(),
+        query: ui.query.value.trim(),
+        maxIterations: Number(ui.maxIterations.value)
+      };
+      const missing = [];
+      for (const [field, value, label] of [
+        [ui.apiBase, config.apiBase, "API Base"],
+        [ui.apiKey, config.apiKey, "API Key"],
+        [ui.model, config.model, "Model"],
+        [ui.query, config.query, "用户问题"]
+      ]) {
+        if (!value) {
+          field.setAttribute("aria-invalid", "true");
+          missing.push(label);
+        }
+      }
+      if (!Number.isInteger(config.maxIterations) || config.maxIterations < 1 || config.maxIterations > 100) {
+        ui.maxIterations.setAttribute("aria-invalid", "true");
+        missing.push("最大轮次（1–100 的整数）");
+      }
+      if (missing.length) {
+        setStatus("error", "配置不完整", `请检查：${missing.join("、")}。未发起网络请求。`);
+        const firstInvalid = ui.form.querySelector("[aria-invalid='true']");
+        if (firstInvalid) firstInvalid.focus();
+        return null;
+      }
+      try {
+        const parsed = new URL(config.apiBase);
+        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error();
+      } catch {
+        ui.apiBase.setAttribute("aria-invalid", "true");
+        setStatus("error", "API Base 无效", "请输入以 http:// 或 https:// 开头的 OpenAI 兼容端点。未发起网络请求。");
+        ui.apiBase.focus();
+        return null;
+      }
+      return config;
+    }
+
+    function redactSecrets(value, config = runtime.config) {
+      let text = String(value ?? "");
+      if (config) {
+        for (const secret of [config.apiKey, config.githubToken]) {
+          if (secret) text = text.split(secret).join("[已隐藏]");
+        }
+      }
+      return text;
+    }
+
+    function chatCompletionsUrl(apiBase) {
+      return `${apiBase.trim().replace(/\/+$/, "")}/chat/completions`;
+    }
+
+    function errorSummary(payload, fallback) {
+      if (payload && typeof payload === "object") {
+        const candidate = payload.error?.message || payload.message || payload.error;
+        if (typeof candidate === "string" && candidate) return candidate;
+      }
+      return fallback;
+    }
+
+    async function responseError(response, prefix) {
+      const raw = await response.text();
+      let payload = null;
+      try { payload = JSON.parse(raw); } catch { /* 非 JSON 错误响应直接使用文本。 */ }
+      const summary = errorSummary(payload, raw || response.statusText || "未知错误");
+      throw new HttpError(response.status, `${prefix}（HTTP ${response.status}）：${summary}`);
+    }
+
+    function parseSseEvent(eventText) {
+      const dataLines = [];
+      for (const line of eventText.split(/\r\n|\r|\n/)) {
+        if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+      }
+      return dataLines.length ? dataLines.join("\n") : null;
+    }
+
+    function takeSseEvent(buffer) {
+      // 逐行找真正的空行，避免正则回溯把单个 CRLF 错当成两个换行。
+      let lineStart = 0;
+      let index = 0;
+      while (index < buffer.length) {
+        const character = buffer[index];
+        if (character !== "\r" && character !== "\n") {
+          index += 1;
+          continue;
+        }
+        const newlineLength = character === "\r" && buffer[index + 1] === "\n" ? 2 : 1;
+        if (index === lineStart) {
+          return {
+            event: buffer.slice(0, index),
+            rest: buffer.slice(index + newlineLength)
+          };
+        }
+        index += newlineLength;
+        lineStart = index;
+      }
+      return null;
+    }
+
+    async function streamChatCompletion(config, messages, callbacks = {}, signal) {
+      let response;
+      try {
+        response = await fetch(chatCompletionsUrl(config.apiBase), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${config.apiKey}`
+          },
+          body: JSON.stringify({
+            model: config.model,
+            messages,
+            tools: TOOLS,
+            temperature: 0.5,
+            stream: true
+          }),
+          signal
+        });
+      } catch (error) {
+        if (error.name === "AbortError") throw error;
+        throw new Error(`无法连接模型端点：${error.message}。请检查网络，以及该端点是否允许 file:// 页面的 CORS 跨域请求。`, { cause: error });
+      }
+
+      if (!response.ok) await responseError(response, "模型接口请求失败");
+      if (!response.body || typeof response.body.getReader !== "function") {
+        throw new Error("模型端点未提供可读取的流式响应。请确认端点支持 stream=true 和浏览器 ReadableStream。");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      const contentParts = [];
+      const toolCalls = new Map();
+      let buffer = "";
+
+      const processEvent = (eventText) => {
+        const data = parseSseEvent(eventText);
+        if (data === null) return;
+        if (data.trim() === "[DONE]") return;
+        let payload;
+        try {
+          payload = JSON.parse(data);
+        } catch (error) {
+          throw new Error(`SSE 数据不是有效 JSON：${error.message}`, { cause: error });
+        }
+        const delta = payload.choices?.[0]?.delta;
+        if (!delta) return;
+        if (delta.content) {
+          contentParts.push(delta.content);
+          callbacks.onContent?.(delta.content);
+        }
+        for (const incoming of delta.tool_calls || []) {
+          const index = incoming.index;
+          if (!Number.isInteger(index)) throw new Error("模型返回的 tool_call 缺少有效的 index。 ");
+          if (!toolCalls.has(index)) {
+            toolCalls.set(index, { id: "", type: "function", function: { name: "", arguments: "" } });
+          }
+          const accumulated = toolCalls.get(index);
+          if (incoming.id) accumulated.id = incoming.id;
+          if (incoming.function?.name) accumulated.function.name = incoming.function.name;
+          if (incoming.function?.arguments) accumulated.function.arguments += incoming.function.arguments;
+          callbacks.onToolCall?.(accumulated, index);
+        }
+      };
+
+      while (true) {
+        const { value, done: streamDone } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !streamDone });
+        let extracted;
+        while ((extracted = takeSseEvent(buffer)) !== null) {
+          processEvent(extracted.event);
+          buffer = extracted.rest;
+        }
+        if (streamDone) break;
+      }
+      if (buffer.trim()) processEvent(buffer);
+
+      return {
+        role: "assistant",
+        content: contentParts.join("") || null,
+        tool_calls: toolCalls.size ? Array.from(toolCalls.entries()).sort(([a], [b]) => a - b).map(([, call]) => call) : null
+      };
+    }
+
+    function repositoryPath(repoFullName) {
+      const parts = String(repoFullName || "").trim().split("/");
+      if (parts.length !== 2 || parts.some((part) => !part)) {
+        throw new Error(`无效的 repo_full_name：${repoFullName}。应为 owner/repo。`);
+      }
+      return parts.map(encodeURIComponent).join("/");
+    }
+
+    function filePathUrl(filePath) {
+      if (!String(filePath || "").trim()) throw new Error("file_path 不能为空。 ");
+      return String(filePath).split("/").map(encodeURIComponent).join("/");
+    }
+
+    async function githubJson(path, token, signal) {
+      const headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      let response;
+      try {
+        response = await fetch(`https://api.github.com${path}`, { headers, signal });
+      } catch (error) {
+        if (error.name === "AbortError") throw error;
+        throw new Error(`无法连接 GitHub API：${error.message}。请检查网络或浏览器 CORS 设置。`, { cause: error });
+      }
+      if (!response.ok) await responseError(response, "GitHub 工具请求失败");
+      return response.json();
+    }
+
+    async function getRepoTree(args, token, signal) {
+      const branch = args.branch || "main";
+      const path = `/repos/${repositoryPath(args.repo_full_name)}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+      const payload = await githubJson(path, token, signal);
+      if (!Array.isArray(payload.tree)) throw new Error("GitHub 目录树响应缺少 tree 数组。 ");
+      const paths = payload.tree.map((item) => item.path);
+      return paths.length ? `${paths.join("\n")}\n` : "";
+    }
+
+    function decodeBase64Utf8(content) {
+      const binary = atob(String(content).replace(/\s/g, ""));
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      return new TextDecoder("utf-8").decode(bytes);
+    }
+
+    async function getRepoFileContent(args, token, signal) {
+      const branch = args.branch || "main";
+      const path = `/repos/${repositoryPath(args.repo_full_name)}/contents/${filePathUrl(args.file_path)}?ref=${encodeURIComponent(branch)}`;
+      const payload = await githubJson(path, token, signal);
+      if (Array.isArray(payload) || payload.type !== "file" || typeof payload.content !== "string" || (payload.encoding && payload.encoding !== "base64")) {
+        throw new Error("目标不是可读取的普通文件，或文件过大导致 GitHub 未返回内联内容。 ");
+      }
+      return decodeBase64Utf8(payload.content);
+    }
+
+    function parseToolArguments(toolCall) {
+      let args;
+      try {
+        args = JSON.parse(toolCall.function.arguments || "{}");
+      } catch (error) {
+        throw new Error(`工具 ${toolCall.function.name || "(未命名)"} 的 arguments 不是有效 JSON：${error.message}`, { cause: error });
+      }
+      if (!args || Array.isArray(args) || typeof args !== "object") {
+        throw new Error(`工具 ${toolCall.function.name} 的 arguments 必须是 JSON 对象。`);
+      }
+      return args;
+    }
+
+    async function executeToolCall(toolCall, config, signal) {
+      const args = parseToolArguments(toolCall);
+      if (toolCall.function.name === "get_repo_tree") return getRepoTree(args, config.githubToken, signal);
+      if (toolCall.function.name === "get_repo_file_content") return getRepoFileContent(args, config.githubToken, signal);
+      throw new Error(`未知工具：${toolCall.function.name || "(空函数名)"}`);
+    }
+
+    function makeElement(tag, className, text) {
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      if (text !== undefined) element.textContent = text;
+      return element;
+    }
+
+    function makeBadge(text, kind = "") {
+      return makeElement("span", `badge${kind ? ` ${kind}` : ""}`, text);
+    }
+
+    function makeDetails(summaryText, initialText = "") {
+      const details = makeElement("details");
+      const summary = makeElement("summary", "", summaryText);
+      const body = makeElement("div", "details-body");
+      const pre = makeElement("pre", "code", initialText);
+      body.append(pre);
+      details.append(summary, body);
+      return { details, pre, summary };
+    }
+
+    function clearOutput() {
+      if (runtime.running) return;
+      ui.timeline.replaceChildren();
+      ui.timeline.append(makeElement("div", "empty-state", "尚未运行。建议观察第 1 轮目录侦察、中间轮文件读取，以及最后一轮最终回答。"));
+      ui.answerOutput.textContent = "模型不再请求工具时，最终回答会显示在这里。";
+      ui.answerOutput.classList.add("placeholder");
+      ui.answerBadge.className = "badge";
+      ui.answerBadge.textContent = "等待运行";
+      setStatus("", "就绪", "填写 API Key 后开始；执行轨迹会按轮次出现在下方。");
+      runtime.activeModel = null;
+      runtime.activeTools = new Map();
+    }
+
+    function addUserCard(query) {
+      const card = makeElement("article", "card user");
+      const header = makeElement("div", "card-header");
+      header.append(makeElement("div", "card-title", "用户问题"), makeBadge("输入"));
+      const body = makeElement("div", "card-body");
+      body.append(makeElement("pre", "code", query));
+      card.append(header, body);
+      ui.timeline.append(card);
+    }
+
+    function createRound(iteration, config, messages) {
+      const round = makeElement("section", "round");
+      round.append(makeElement("div", "round-heading", `第 ${iteration} 轮 · ${config.model}`));
+      const content = makeElement("div", "round-content");
+      round.append(content);
+      ui.timeline.append(round);
+
+      const card = makeElement("article", "card model");
+      const header = makeElement("div", "card-header");
+      const title = makeElement("div", "card-title", "模型请求与响应");
+      title.append(makeElement("div", "card-subtitle", `发送 ${messages.length} 条 messages · 流式接收 content 与 tool_calls`));
+      const badge = makeBadge("请求中", "running");
+      header.append(title, badge);
+      const body = makeElement("div", "card-body");
+      const modelContent = makeElement("pre", "code model-content");
+      const requestDetails = makeDetails(`发送给模型的 messages（${messages.length} 条）`, JSON.stringify(messages, null, 2));
+      body.append(modelContent, requestDetails.details);
+      card.append(header, body);
+      content.append(card);
+      const refs = { card, badge, content: modelContent, roundContent: content, text: "" };
+      runtime.activeModel = refs;
+      runtime.activeTools = new Map();
+      return refs;
+    }
+
+    function updateModelContent(model, delta, isFinalCandidate) {
+      model.text += delta;
+      model.content.textContent = model.text;
+      if (isFinalCandidate) {
+        ui.answerOutput.classList.remove("placeholder");
+        ui.answerOutput.textContent = model.text;
+        ui.answerBadge.className = "badge running";
+        ui.answerBadge.textContent = "接收本轮正文";
+      }
+    }
+
+    function upsertToolCard(model, toolCall, index) {
+      if (runtime.activeTools.has(index)) {
+        const existing = runtime.activeTools.get(index);
+        existing.name.textContent = toolCall.function.name || `工具调用 #${index + 1}`;
+        existing.arguments.textContent = toolCall.function.arguments || "等待 arguments…";
+        return existing;
+      }
+      const card = makeElement("article", "card tool");
+      const header = makeElement("div", "card-header");
+      const name = makeElement("div", "card-title", toolCall.function.name || `工具调用 #${index + 1}`);
+      name.append(makeElement("div", "card-subtitle", `tool_calls[${index}] · 参数按流式片段累积`));
+      const badge = makeBadge("接收参数", "running");
+      header.append(name, badge);
+      const body = makeElement("div", "card-body");
+      const meta = makeElement("div", "tool-meta");
+      const timing = makeElement("span", "", "尚未执行");
+      const resultSize = makeElement("span", "", "结果：等待执行");
+      meta.append(timing, resultSize);
+      const argsDetails = makeDetails("完整调用参数", toolCall.function.arguments || "等待 arguments…");
+      argsDetails.details.open = true;
+      const resultDetails = makeDetails("完整工具结果（结果将回填到下一轮）", "等待工具执行…");
+      body.append(meta, argsDetails.details, resultDetails.details);
+      card.append(header, body);
+      model.roundContent.append(card);
+      const refs = {
+        card, name, badge, timing, resultSize,
+        arguments: argsDetails.pre,
+        result: resultDetails.pre,
+        startedAt: null,
+        state: "receiving"
+      };
+      runtime.activeTools.set(index, refs);
+      return refs;
+    }
+
+    function setCardBadge(refs, text, kind = "") {
+      refs.badge.textContent = text;
+      refs.badge.className = `badge${kind ? ` ${kind}` : ""}`;
+    }
+
+    function beginToolExecution(refs, toolCall) {
+      refs.state = "executing";
+      refs.startedAt = performance.now();
+      setCardBadge(refs, "执行中", "running");
+      refs.timing.textContent = "正在调用 GitHub REST API…";
+      const args = parseToolArguments(toolCall);
+      refs.arguments.textContent = JSON.stringify(args, null, 2);
+    }
+
+    function finishToolExecution(refs, result) {
+      const elapsed = refs.startedAt === null ? 0 : performance.now() - refs.startedAt;
+      refs.state = "success";
+      setCardBadge(refs, "执行成功", "success");
+      refs.timing.textContent = `耗时 ${(elapsed / 1000).toFixed(2)} 秒`;
+      refs.resultSize.textContent = `结果：${result.length.toLocaleString("zh-CN")} 字符`;
+      refs.result.textContent = result;
+    }
+
+    function failToolExecution(refs, error, config) {
+      refs.state = "error";
+      setCardBadge(refs, "执行失败", "error");
+      refs.timing.textContent = "工具执行已终止";
+      refs.result.textContent = redactSecrets(error.message, config);
+    }
+
+    function appendErrorCard(message) {
+      const card = makeElement("article", "card error");
+      const header = makeElement("div", "card-header");
+      header.append(makeElement("div", "card-title", "运行错误"), makeBadge("已终止", "error"));
+      const body = makeElement("div", "card-body");
+      body.append(makeElement("pre", "error-text", message));
+      card.append(header, body);
+      ui.timeline.append(card);
+    }
+
+    function isAbort(error) {
+      return error?.name === "AbortError" || runtime.stopRequested;
+    }
+
+    function assertActive(runId) {
+      if (runtime.stopRequested || runId !== runtime.runId) {
+        throw new DOMException("本次运行已停止", "AbortError");
+      }
+    }
+
+    function markStopped() {
+      if (runtime.activeModel && ["请求中"].includes(runtime.activeModel.badge.textContent)) {
+        setCardBadge(runtime.activeModel, "已停止", "stopped");
+      }
+      for (const tool of runtime.activeTools.values()) {
+        if (tool.state === "receiving" || tool.state === "executing") {
+          tool.state = "stopped";
+          setCardBadge(tool, "已停止", "stopped");
+          tool.timing.textContent = "用户停止了本次运行";
+        }
+      }
+    }
+
+    async function runAgent(config, runId) {
+      const messages = [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: config.query }
+      ];
+
+      for (let iteration = 0; iteration < config.maxIterations; iteration += 1) {
+        assertActive(runId);
+        setStatus("running", `第 ${iteration + 1} 轮：请求模型`, "正在发送 messages，并等待流式响应…");
+        const model = createRound(iteration + 1, config, messages);
+        let sawContent = false;
+        const response = await streamChatCompletion(config, messages, {
+          onContent(delta) {
+            assertActive(runId);
+            sawContent = true;
+            updateModelContent(model, delta, true);
+          },
+          onToolCall(toolCall, index) {
+            assertActive(runId);
+            upsertToolCard(model, toolCall, index);
+          }
+        }, runtime.controller.signal);
+        assertActive(runId);
+
+        if (!response.tool_calls) {
+          setCardBadge(model, "最终回答", "success");
+          ui.answerOutput.classList.remove("placeholder");
+          ui.answerOutput.textContent = response.content || "模型未返回正文。";
+          ui.answerBadge.className = "badge success";
+          ui.answerBadge.textContent = "已完成";
+          setStatus("success", "执行完成", `共请求模型 ${iteration + 1} 轮；本轮没有 tool_calls，Agent 循环结束。`);
+          return response.content;
+        }
+
+        setCardBadge(model, `请求 ${response.tool_calls.length} 个工具`, "success");
+        if (sawContent) {
+          ui.answerOutput.textContent = "本轮正文属于中间模型响应；模型仍请求工具，尚未形成最终回答。";
+          ui.answerOutput.classList.add("placeholder");
+          ui.answerBadge.className = "badge running";
+          ui.answerBadge.textContent = "继续执行";
+        }
+
+        // 必须先保存 assistant 的 tool_calls，再追加一一对应的 tool 结果。
+        messages.push({ role: response.role, content: response.content, tool_calls: response.tool_calls });
+        for (let index = 0; index < response.tool_calls.length; index += 1) {
+          assertActive(runId);
+          const toolCall = response.tool_calls[index];
+          const toolRefs = upsertToolCard(model, toolCall, index);
+          setStatus("running", `第 ${iteration + 1} 轮：执行 ${toolCall.function.name || "工具"}`, "解析完整 arguments，并调用 GitHub REST API…");
+          try {
+            beginToolExecution(toolRefs, toolCall);
+            const result = await executeToolCall(toolCall, config, runtime.controller.signal);
+            assertActive(runId);
+            finishToolExecution(toolRefs, result);
+            messages.push({
+              role: "tool",
+              content: result,
+              tool_call_id: toolCall.id,
+              name: toolCall.function.name
+            });
+          } catch (error) {
+            if (isAbort(error)) {
+              toolRefs.state = "stopped";
+              setCardBadge(toolRefs, "已停止", "stopped");
+              toolRefs.timing.textContent = "用户停止了本次运行";
+            } else {
+              failToolExecution(toolRefs, error, config);
+            }
+            throw error;
+          }
+        }
+      }
+      throw new Error(`已达到最大轮次 ${config.maxIterations}，模型仍未给出最终回答。请增大轮次或调整问题。`);
+    }
+
+    async function startRun(event) {
+      event.preventDefault();
+      if (runtime.running) return;
+      const config = readConfig();
+      if (!config) return;
+
+      clearOutput();
+      ui.timeline.replaceChildren();
+      addUserCard(config.query);
+      ui.answerOutput.textContent = "等待最终轮模型正文…";
+      ui.answerOutput.classList.add("placeholder");
+      ui.answerBadge.className = "badge running";
+      ui.answerBadge.textContent = "等待最终轮";
+
+      runtime.runId += 1;
+      const runId = runtime.runId;
+      runtime.config = config;
+      runtime.stopRequested = false;
+      runtime.controller = new AbortController();
+      setRunning(true);
+      setStatus("running", "开始执行", "初始化 system/user messages…");
+
+      try {
+        await runAgent(config, runId);
+      } catch (error) {
+        if (isAbort(error) || runId !== runtime.runId) {
+          markStopped();
+          setStatus("stopped", "已停止", "已取消当前网络请求，保留现有轨迹；未获得最终回答。 ");
+          ui.answerOutput.textContent = "本次运行由用户停止，未获得最终回答。";
+          ui.answerOutput.classList.add("placeholder");
+          ui.answerBadge.className = "badge stopped";
+          ui.answerBadge.textContent = "已停止";
+        } else {
+          const message = redactSecrets(error.message || String(error), config);
+          if (runtime.activeModel && runtime.activeModel.badge.textContent === "请求中") {
+            setCardBadge(runtime.activeModel, "响应失败", "error");
+          }
+          appendErrorCard(message);
+          setStatus("error", "执行失败", message);
+          ui.answerOutput.textContent = "运行失败，未获得最终回答。请查看时间线中的错误详情。";
+          ui.answerOutput.classList.add("placeholder");
+          ui.answerBadge.className = "badge error";
+          ui.answerBadge.textContent = "失败";
+        }
+      } finally {
+        if (runId === runtime.runId) {
+          setRunning(false);
+          runtime.controller = null;
+          runtime.stopRequested = false;
+        }
+      }
+    }
+
+    function stopRun() {
+      if (!runtime.running) return;
+      runtime.stopRequested = true;
+      ui.stopButton.disabled = true;
+      setStatus("stopped", "正在停止", "正在取消当前请求，已产生的时间线会保留…");
+      runtime.controller?.abort();
+    }
+
+    ui.form.addEventListener("submit", startRun);
+    ui.stopButton.addEventListener("click", stopRun);
+    ui.clearButton.addEventListener("click", clearOutput);
+    for (const field of [ui.apiBase, ui.apiKey, ui.model, ui.maxIterations, ui.query]) {
+      field.addEventListener("input", () => field.removeAttribute("aria-invalid"));
+    }
+  </script>
+</body>
+</html>
